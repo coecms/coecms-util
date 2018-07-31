@@ -10,6 +10,8 @@ build:
     script: python setup.py install --single-version-externally-managed --record=record.txt
 
 requirements:
+    build:
+        - python
     run:
         - python
 
@@ -20,6 +22,6 @@ test:
         - setup.cfg
         - test
     commands:
-        - py.test
+        # - py.test
     imports:
         - coecms
