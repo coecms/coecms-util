@@ -50,6 +50,7 @@ run_conda: &run_conda
         - run:
             name: build
             command: |
+                source ~/miniconda/bin/activate root
                 ~/miniconda/bin/conda build --python=${PYTHON_VER} -c conda-forge conda/
 
 version: 2
