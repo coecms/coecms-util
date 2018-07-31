@@ -6,31 +6,15 @@ run_pytest: &run_pytest
             name: install
             command: |
                 source venv/bin/activate
-                pip install pytest coverage pytest-cov
+                pip install pytest coverage pytest-cov codecov
                 pip install -e .[test]
         - run:
             name: test
             command: |
                 source venv/bin/activate
                 mkdir -p test-report/pytest
-                py.test --cov=coecms --cov-report xml \
-                    --junit-xml=test-report/pytest/sqlite.xml --junit-prefix='sqlite'
-        - run:
-            name: coverage-collect
-            command: |
-                mkdir coverage
-                curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > cc-test-reporter
-                chmod +x cc-test-reporter
-                ./cc-test-reporter format-coverage --output "coverage/coverage.${CIRCLE_STAGE}.json"
-                cat "coverage/coverage.${CIRCLE_STAGE}.json"
-        - store_test_results:
-            path: test-report
-        - store_artifacts:
-            path: test-report
-        - persist_to_workspace:
-            root: coverage
-            paths:
-                - coverage.*.json
+                py.test --cov=coecms --cov-report xml
+                codecov
 
 run_conda: &run_conda
     docker:
@@ -68,20 +52,6 @@ jobs:
         environment:
             PYTHON_VER=3
         <<: *run_conda
-    coverage-report:
-        docker:
-            - image: circleci/python
-        steps:
-            - attach_workspace:
-                at: workspace
-            - run:
-                name: coverage-report
-                command: |
-                    curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > cc-test-reporter
-                    chmod +x cc-test-reporter
-                    ./cc-test-reporter sum-coverage --parts 2 workspace/coverage.*.json -o coverage.json
-                    ./cc-test-reporter upload-coverage --input coverage.json
-                    cat coverage.json
 
 workflows:
     version: 2
@@ -90,7 +60,3 @@ workflows:
             - python2
             - python3
             - conda3
-            - coverage-report:
-                requires:
-                    - python2
-                    - python3
