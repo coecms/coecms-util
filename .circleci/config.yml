@@ -1,0 +1,92 @@
+run_pytest: &run_pytest
+    steps:
+        - checkout
+        - run: virtualenv venv
+        - run:
+            name: install
+            command: |
+                source venv/bin/activate
+                pip install -e .[test]
+        - run:
+            name: test
+            command: |
+                source venv/bin/activate
+                mkdir -p test-report/pytest
+                py.test --cov=coecms --cov-report xml \
+                    --junit-xml=test-report/pytest/sqlite.xml --junit-prefix='sqlite'
+        - run:
+            name: coverage-collect
+            command: |
+                mkdir coverage
+                curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > cc-test-reporter
+                chmod +x cc-test-reporter
+                ./cc-test-reporter format-coverage --output "coverage/coverage.${CIRCLE_STAGE}.json"
+                cat "coverage/coverage.${CIRCLE_STAGE}.json"
+        - store_test_results:
+            path: test-report
+        - store_artifacts:
+            path: test-report
+        - persist_to_workspace:
+            root: coverage
+            paths:
+                - coverage.*.json
+
+run_conda: &run_conda
+    docker:
+        - image: circleci/python
+    steps:
+        - checkout
+        - run:
+            name: install-conda
+            command: |
+                wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O conda.sh
+                bash conda.sh -b -p ~/miniconda
+        - run:
+            name: setup
+            command: |
+                ~/miniconda/bin/conda install --yes conda-build anaconda-client
+                ~/miniconda/bin/conda config --system --add channels conda-forge
+        - run:
+            name: build
+            command: |
+                ~/miniconda/bin/conda build conda/
+
+version: 2
+
+jobs:
+    python2:
+        docker:
+            - image: circleci/python:2
+        <<: *run_pytest
+    python3:
+        docker:
+            - image: circleci/python:3
+        <<: *run_pytest
+    conda3:
+        <<: *run_conda
+    coverage-report:
+        docker:
+            - image: circleci/python
+        steps:
+            - attach_workspace:
+                at: workspace
+            - run:
+                name: coverage-report
+                command: |
+                    curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > cc-test-reporter
+                    chmod +x cc-test-reporter
+                    ./cc-test-reporter sum-coverage --parts 2 workspace/coverage.*.json -o coverage.json
+                    ./cc-test-reporter upload-coverage --input coverage.json
+                    cat coverage.json
+
+workflows:
+    version: 2
+    pytest:
+        jobs:
+            - python2
+            - python3
+            - conda3
+            - coverage-report:
+                requires:
+                    - python2
+                    - python3
