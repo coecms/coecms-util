@@ -45,7 +45,7 @@ run_conda: &run_conda
         - run:
             name: setup
             command: |
-                ~/miniconda/bin/conda install --yes conda-build anaconda-client
+                ~/miniconda/bin/conda install --yes conda-build conda-verify anaconda-client
                 ~/miniconda/bin/conda config --system --add channels conda-forge
         - run:
             name: build
