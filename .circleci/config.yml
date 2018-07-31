@@ -50,7 +50,7 @@ run_conda: &run_conda
         - run:
             name: build
             command: |
-                ~/miniconda/bin/conda build conda/
+                ~/miniconda/bin/conda build --python=${PYTHON_VER} -c conda-forge conda/
 
 version: 2
 
@@ -64,6 +64,8 @@ jobs:
             - image: circleci/python:3
         <<: *run_pytest
     conda3:
+        environment:
+            PYTHON_VER=3
         <<: *run_conda
     coverage-report:
         docker:
