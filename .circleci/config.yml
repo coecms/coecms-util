@@ -6,7 +6,7 @@ run_pytest: &run_pytest
             name: install
             command: |
                 source venv/bin/activate
-                pip install pytest coverage
+                pip install pytest coverage pytest-cov
                 pip install -e .[test]
         - run:
             name: test
