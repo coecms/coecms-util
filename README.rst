@@ -15,9 +15,10 @@ CLEX CMS Utility Library
 Development
 -----------
 
-Create a dev conda environment::
+Create and activate a conda environment::
 
     conda env create -f conda/dev-environment.yml
+    conda activate coecms
 
 Install the package::
 
