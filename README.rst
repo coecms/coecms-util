@@ -61,6 +61,12 @@ Creating new versions
 
 To create a new version of the library, use the Github interface at https://github.com/coecms/coecms-util/releases/new 
 
-Versions should be named like `v1.2.3`, using [semantic versioning](https://semver.org/)
+Versions should be named like `v1.2.3`, using `semantic versioning <https://semver.org/>`_.
 
-The Python and Conda packages will automatically set their version based on the tag that Github creates (you may need to `git fetch` the tag first)
+The Python and Conda packages will automatically set their version based on the tag that Github creates (you may need to ``git fetch`` the tag first)
+
+To upload a new version to conda, run::
+
+    conda build --user coecms --python=3.7 ./conda
+
+setting the python version as desired (you will need to be a member of the coecms group on https://anaconda.org to do this)
