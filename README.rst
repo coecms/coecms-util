@@ -1,12 +1,16 @@
 CLEX CMS Utility Library
 ========================
 
+.. image:: https://img.shields.io/readthedocs/coecms-util/stable.svg
+    :target: https://coecms-util.readthedocs.io
 .. image:: https://img.shields.io/circleci/project/github/coecms/coecms-util.svg
     :target: https://circleci.com/gh/coecms/coecms-util/tree/master
 .. image:: https://img.shields.io/codecov/c/github/coecms/coecms-util.svg
     :target: https://codecov.io/gh/coecms/coecms-util
 .. image:: https://img.shields.io/codacy/grade/3706e7a283fd439fa8b8d2f707f814e4.svg
     :target: https://www.codacy.com/app/ScottWales/coecms-util
+.. image:: https://img.shields.io/conda/v/coecms/coecms-util.svg
+    :target: https://anaconda.org/coecms/coecms-util
 
 Development
 -----------
