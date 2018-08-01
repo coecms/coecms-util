@@ -22,3 +22,18 @@ Install the package::
 Run the tests::
 
     py.test
+
+Making Changes
+--------------
+
+Changes need to be done in a new branch as a pull request::
+
+    git checkout -b my-branch
+
+    # Make changes...
+
+    git push --set-upstream origin my-branch
+
+Then make a pull request at https://github.com/coecms/coecms-util/pull/new
+
+Please make sure code changes include tests and documentation
