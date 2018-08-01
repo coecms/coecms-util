@@ -65,7 +65,7 @@ Versions should be named like `v1.2.3`, using `semantic versioning <https://semv
 
 The Python and Conda packages will automatically set their version based on the tag that Github creates (you may need to ``git fetch`` the tag first)
 
-To upload a new version to conda, run::
+To upload a new version to conda, check out the tag (e.g. `git checkout v1.2.3`) then run::
 
     conda build --user coecms --python=3.7 ./conda
 
