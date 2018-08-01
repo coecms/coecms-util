@@ -37,3 +37,5 @@ Changes need to be done in a new branch as a pull request::
 Then make a pull request at https://github.com/coecms/coecms-util/pull/new
 
 Please make sure code changes include tests and documentation
+
+Changes must be reviewed by someone in the CMS team before they are committed to master
