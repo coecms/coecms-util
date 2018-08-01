@@ -52,6 +52,15 @@ Adding Dependencies
 
 To add a dependency, you need to edit two files:
 
- * conda/meta.yaml: This has the conda package names of dependencies. They might not be the same as the actual Python library names. This is used by `conda build` to create the conda package
+* conda/meta.yaml: This has the conda package names of dependencies. They might not be the same as the actual Python library names. This is used by `conda build` to create the conda package
 
- * setup.py: This has the Python name of dependencies. This is used if you `pip install` the package locally for testing.
+* setup.py: This has the Python name of dependencies. This is used if you `pip install` the package locally for testing.
+
+Creating new versions
+---------------------
+
+To create a new version of the library, use the Github interface at https://github.com/coecms/coecms-util/releases/new 
+
+Versions should be named like `v1.2.3`, using [semantic versioning](https://semver.org/)
+
+The Python and Conda packages will automatically set their version based on the tag that Github creates (you may need to `git fetch` the tag first)
