@@ -52,9 +52,9 @@ Adding Dependencies
 
 To add a dependency, you need to edit two files:
 
-* conda/meta.yaml: This has the conda package names of dependencies. They might not be the same as the actual Python library names. This is used by `conda build` to create the conda package
+* conda/meta.yaml: This has the conda package names of dependencies. They might not be the same as the actual Python library names. This is used by `conda build` to create the conda package. Add dependencies to the ``requirements: run:`` list.
 
-* setup.py: This has the Python name of dependencies. This is used if you `pip install` the package locally for testing.
+* setup.py: This has the Python name of dependencies. This is used if you `pip install` the package locally for testing. Add dependencies to the ``install_requires`` list.
 
 Creating new versions
 ---------------------
