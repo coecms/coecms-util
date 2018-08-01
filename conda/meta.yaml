@@ -16,12 +16,12 @@ requirements:
         - python
 
 test:
-    requries:
+    requires:
         - pytest
     source_files:
         - setup.cfg
         - test
     commands:
-        # - py.test
+        - py.test
     imports:
         - coecms
