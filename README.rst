@@ -31,6 +31,8 @@ Run the tests::
 Making Changes
 --------------
 
+To add to the repository, first create your own fork on Github at https://github.com/coecms/coecms-util/fork
+
 Changes need to be done in a new branch as a pull request::
 
     git checkout -b my-branch
