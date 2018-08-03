@@ -19,7 +19,7 @@ To add to the repository, first create your own fork on Github at https://github
 
 Create and activate a new conda environment so you can work on the library without affecting your other environments, then install the library in development mode using ``pip``::
 
-    # # On Raijin only:
+    # # On Raijin/VDI only:
     # module use /g/data3/hh5/public/modules
     # module load conda
 
