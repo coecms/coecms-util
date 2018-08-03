@@ -15,23 +15,28 @@ CLEX CMS Utility Library
 Development
 -----------
 
-Create and activate a conda environment::
+To add to the repository, first create your own fork on Github at https://github.com/coecms/coecms-util/fork, then download new forked repository (either to Raijin or your own computer)
 
+Create and activate a new conda environment so you can work on the library without affecting your other environments, then install the library in development mode using ``pip``::
+
+    # # On Raijin only:
+    # module use /g/data3/hh5/public/modules
+    # module load conda
+
+    # This creates an environment named 'coecms'
     conda env create -f conda/dev-environment.yml
+
     conda activate coecms
 
-Install the package::
-
+    # '-e' installs in editable mode
     pip install -e .
 
-Run the tests::
+You can then run the tests to confirm everything is working correctly using::
 
     py.test
 
 Making Changes
 --------------
-
-To add to the repository, first create your own fork on Github at https://github.com/coecms/coecms-util/fork
 
 Changes need to be done in a new branch as a pull request::
 
