@@ -1,0 +1,6 @@
+*.swp
+*.egg-info
+
+/doc/_build
+.pytest_cache
+__pycache__
