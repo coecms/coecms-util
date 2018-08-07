@@ -8,6 +8,7 @@ run_pytest: &run_pytest
                 source venv/bin/activate
                 pip install pytest coverage pytest-cov codecov
                 pip install -e .[test]
+                sudo apt install cdo
         - run:
             name: test
             command: |
