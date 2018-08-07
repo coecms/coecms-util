@@ -3,4 +3,5 @@
 
 /doc/_build
 .pytest_cache
+.cache
 __pycache__
