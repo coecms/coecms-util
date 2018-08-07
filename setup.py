@@ -11,6 +11,8 @@ setup(
         cmdclass=versioneer.get_cmdclass(),
 
         install_requires = [
+            'xarray',
+            'netcdf4',
             ],
         entry_points = {
             'console_scripts': [
