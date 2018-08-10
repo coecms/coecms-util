@@ -22,6 +22,7 @@ import xarray
 import numpy
 import tempfile
 import scipy.sparse
+import sys
 
 
 def cdo_generate_weights(source_data, target_grid, method):
@@ -56,6 +57,11 @@ def cdo_generate_weights(source_data, target_grid, method):
         weights = xarray.open_dataset(weight_file.name)
         return weights
 
+    except subprocess.CalledProcessError as e:
+        # Print the CDO error message
+        print(e.stderr.decode(), file=sys.stderr)
+        raise
+
     finally:
         source_data_file.close()
         target_grid_file.close()
@@ -79,13 +85,13 @@ def apply_weights(source_data, weights):
     weight_matrix = scipy.sparse.coo_matrix((w.remap_matrix[:,0],
         (w.src_address.data - 1, w.dst_address.data -1)))
 
-    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data),
+    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data, order='F').T,
             name='lat', attrs = w.dst_grid_center_lat.attrs, dims=['i','j'])
 
-    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data),
+    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data, order='F').T,
             name='lon', attrs = w.dst_grid_center_lon.attrs, dims=['i','j'])
 
-    data = (source_data.data.reshape(-1) * weight_matrix).reshape(w.dst_grid_dims.data)
+    data = (source_data.data.reshape(-1) * weight_matrix).reshape(w.dst_grid_dims.data, order='F').T
     return xarray.DataArray(data, dims=['i', 'j'], coords={'lat': lat, 'lon': lon},
             name=source_data.name, attrs=source_data.attrs)
 

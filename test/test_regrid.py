@@ -20,6 +20,7 @@ from coecms.regrid import *
 import xarray
 import numpy
 import tempfile
+import numpy.testing
 
 
 def test_cdo_generate_weights(tmpdir):
@@ -31,6 +32,49 @@ def test_cdo_generate_weights(tmpdir):
     d[:,:] = center_lon
 
     grid = identify_grid(d)
-    weights = cdo_generate_weights(d, grid, None)
+    weights = cdo_generate_weights(d, grid, 'bilinear')
 
     assert 'remap_matrix' in weights
+
+
+def compare_regrids(tmpdir, source, target):
+    """
+    Check our weight application matches CDO's
+    """
+    import subprocess 
+
+    grid = identify_grid(target)
+    gridfile = tmpdir.join('grid')
+    with open(gridfile, 'wb') as f:
+        grid.to_cdo_grid(f)
+
+    sourcefile = tmpdir.join('source.nc')
+    source.to_netcdf(str(sourcefile))
+
+    outfile = tmpdir.join('out.nc')
+    subprocess.check_call(['cdo','remapbil,%s'%gridfile,sourcefile,outfile])
+    
+    cdo = xarray.open_dataset(str(outfile))
+
+    cms = regrid(source, target, 'bilinear')
+
+    numpy.testing.assert_array_equal(cdo['var'].data[...], cms.data[...])
+
+
+def test_compare_regrids(tmpdir):
+
+    a0 = xarray.DataArray(
+            [[0,1],[2,3]],
+            name='var',
+            dims=['lat','lon'],
+            coords={'lat': [-45,45], 'lon': [0, 180]})
+
+    compare_regrids(tmpdir.mkdir('a0a0'), a0, a0)
+
+    a1 = xarray.DataArray(
+            numpy.zeros((3,4)),
+            name='var',
+            dims=['lat','lon'],
+            coords={'lat': [-90,0,90], 'lon': [0, 90, 180, 270]})
+
+    compare_regrids(tmpdir.mkdir('a1a1'), a1, a1)
