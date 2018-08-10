@@ -15,14 +15,13 @@
 # limitations under the License.
 from __future__ import print_function
 
-from coecms.grid import identify_grid
-from coecms.regrid import *
+from coecms.grid import *
 import xarray
 import numpy
 import tempfile
 
 
-def test_cdo_generate_weights(tmpdir):
+def test_latlon_grid_to_scrip(tmpdir):
     d = xarray.DataArray(data=numpy.ones((2,4)), coords=[('lat', [-45,45]), ('lon',[0,90,180,270])])
     d.lat.attrs['units'] = 'degrees_north'
     d.lon.attrs['units'] = 'degrees_east'
@@ -30,7 +29,14 @@ def test_cdo_generate_weights(tmpdir):
     center_lon, center_lat = numpy.meshgrid(d.lon, d.lat)
     d[:,:] = center_lon
 
-    grid = identify_grid(d)
-    weights = cdo_generate_weights(d, grid, None)
+    f = tmpdir.join('scrip.nc')
+    identify_grid(d).to_scrip(f)
 
-    assert 'remap_matrix' in weights
+    s = xarray.open_dataset(f)
+
+    assert s.grid_dims[0] == 4
+    assert s.grid_dims[1] == 2
+
+    # Top left corner of bottom left cell
+    assert s.grid_corner_lat[0,0] == 0
+    assert s.grid_corner_lon[0,0] == 315

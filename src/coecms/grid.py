@@ -81,8 +81,8 @@ class LonLatGrid(Grid):
             lons (numpy.array): Grid longitude
         """
 
-        self.lats = numpy.array(lats)
-        self.lons = numpy.array(lons)
+        self.lats = lats
+        self.lons = lons
 
         if self.lats.ndim != 1 or self.lons.ndim != 1:
             raise Exception("Lons and Lats must be 1D")
@@ -107,7 +107,8 @@ class LonLatGrid(Grid):
 
 
     def to_scrip(self, outfile):
-        lon = lon % 360
+        lat = self.lats
+        lon = self.lons % 360
 
         top = (lat.shift(lat=-1)+lat)/2.0
         top[-1] = 90
