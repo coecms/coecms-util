@@ -14,6 +14,10 @@ requirements:
         - python
     run:
         - python
+        - netcdf4
+        - xarray
+        - scipy
+        - numpy
 
 test:
     requires:

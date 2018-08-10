@@ -13,6 +13,7 @@ setup(
         install_requires = [
             'xarray',
             'netcdf4',
+            'scipy'
             ],
         entry_points = {
             'console_scripts': [
