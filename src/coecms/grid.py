@@ -25,7 +25,8 @@ Different grid types
 
 def identify_grid(dataset):
     """
-    Identify the grid used by a Dataset
+    Identify the grid used by a Dataset. Returns the appropriate :class:`Grid`
+    object
 
     Args:
         dataset (xarray.Dataset): Input dataset
@@ -47,6 +48,8 @@ def identify_grid(dataset):
 
 
 class Grid(ABC):
+    """Abstract base class for grids"""
+
 
     @abstractmethod
     def to_cdo_grid(self, outfile):
@@ -57,7 +60,6 @@ class Grid(ABC):
         Args:
             outfile: File-like object to write to
         """
-        pass
 
 
     @abstractmethod
@@ -66,8 +68,24 @@ class Grid(ABC):
         Create a netCDF file using the grid
 
         Args:
-            outfile: File-like object to write to
+            outfile: Path or File-like object to write to
+
+        Note that if `outfile` is a file object it will be closed
+        automatically.
         """
+
+
+    def to_scrip(self, outfile):
+        """
+        Create a SCRIP file using the grid
+
+        Args:
+            outfile: Path or File-like object to write to
+
+        Note that if `outfile` is a file object it will be closed
+        automatically.
+        """
+        raise NotImplementedError
 
 
 class LonLatGrid(Grid):

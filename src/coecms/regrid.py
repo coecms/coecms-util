@@ -91,21 +91,23 @@ def apply_weights(source_data, weights):
 
 
 class Regridder(object):
-    def __init__(self, source_grid, target_grid, method):
-        """
-        Set up the regridding operation
+    """
+    Set up the regridding operation
 
-        Args:
-            source_grid (coecms.regrid.Grid or xarray.Dataset): Source grid / sample dataset
-            target_grid (coecms.regrid.Grid or xarray.Dataset): Target grid / sample dataset
-            method: Regridding method
-        """
+    Args:
+        source_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Source grid / sample dataset
+        target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
+        method: Regridding method
+    """
+
+    def __init__(self, source_grid, target_grid, method):
         self._weights = cdo_generate_weights(source_grid, target_grid, method)
 
 
     def regrid(self, source_data):
         """
-        Regrid the xarray.Dataset ``source_data`` to match the target grid
+        Regrid the xarray.Dataset ``source_data`` to match the target grid,
+        using the weights stored in the regridder
 
         Args:
             source_data (xarray.Dataset): Source dataset
@@ -120,11 +122,14 @@ class Regridder(object):
 def regrid(source_data, target_grid, method):
     """
     A simple regrid. Inefficient if you are regridding more than one dataset
-    to the target grid because it re-generates the weights each time
+    to the target grid because it re-generates the weights each time you call
+    the function.
+
+    To save the weights use :class:`Regridder`.
 
     Args:
         source_data (xarray.Dataset): Source dataset
-        target_grid (coecms.regrid.Grid or xarray.Dataset): Target grid / sample dataset
+        target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
         method: Regridding method
 
     Returns:
