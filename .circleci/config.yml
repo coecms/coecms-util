@@ -7,8 +7,8 @@ run_pytest: &run_pytest
             command: |
                 source venv/bin/activate
                 pip install pytest coverage pytest-cov codecov
-                pip install -e .[test]
                 sudo apt install cdo libnetcdf-dev
+                pip install -e .[test]
         - run:
             name: test
             command: |
