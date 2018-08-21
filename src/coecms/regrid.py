@@ -19,9 +19,9 @@ from .grid import *
 
 import subprocess
 import xarray
-import numpy
+import sparse
+import dask.array
 import tempfile
-import scipy.sparse
 import sys
 
 
@@ -80,18 +80,22 @@ def apply_weights(source_data, weights):
     Returns:
         xarray.Dataset: Regridded version of the source dataset
     """
+    # Alias the weights dataset
     w = weights
 
-    weight_matrix = scipy.sparse.coo_matrix((w.remap_matrix[:,0],
-        (w.src_address.data - 1, w.dst_address.data -1)))
+    # Use sparse instead of scipy as it behaves with Dask
+    weight_matrix = sparse.COO([w.src_address.data - 1, w.dst_address.data - 1], w.remap_matrix[:,0])
 
-    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data, order='F').T,
+    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data[::-1], order='F'),
             name='lat', attrs = w.dst_grid_center_lat.attrs, dims=['i','j'])
 
-    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data, order='F').T,
+    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data[::-1], order='F'),
             name='lon', attrs = w.dst_grid_center_lon.attrs, dims=['i','j'])
 
-    data = (source_data.data.reshape(-1) * weight_matrix).reshape(w.dst_grid_dims.data, order='F').T
+    data = dask.array.matmul(source_data.data.reshape(-1), weight_matrix)
+
+    data = data.reshape(w.dst_grid_dims.data[::-1])
+
     return xarray.DataArray(data, dims=['i', 'j'], coords={'lat': lat, 'lon': lon},
             name=source_data.name, attrs=source_data.attrs)
 
@@ -110,7 +114,7 @@ class Regridder(object):
         method: Regridding method
     """
 
-    def __init__(self, source_grid, target_grid=None, weights=None, method='bilinear'):
+    def __init__(self, source_grid, target_grid=None, method='bilinear', weights=None):
 
         if target_grid is None and weights is None:
             raise Exception("Either weights or target_grid must be supplied")
@@ -140,7 +144,7 @@ class Regridder(object):
         return apply_weights(source_data, self._weights)
 
 
-def regrid(source_data, target_grid=None, weights=None, method='bilinear'):
+def regrid(source_data, target_grid=None, method='bilinear', weights=None):
     """
     A simple regrid. Inefficient if you are regridding more than one dataset
     to the target grid because it re-generates the weights each time you call

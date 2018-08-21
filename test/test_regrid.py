@@ -15,11 +15,10 @@
 # limitations under the License.
 from __future__ import print_function
 
-from coecms.grid import identify_grid
 from coecms.regrid import *
 import xarray
+import dask.array
 import numpy
-import tempfile
 import numpy.testing
 
 
@@ -113,3 +112,18 @@ def test_compare_regrids(tmpdir):
     a1.lon.attrs['units'] = 'degrees_east'
 
     compare_regrids(tmpdir.mkdir('a1a1'), a1, a1)
+
+def test_dask_regrid(tmpdir):
+    d = dask.array.zeros((2,2), chunks=(2,2))
+
+    a0 = xarray.DataArray(
+        d,
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': [-45,45], 'lon': [0, 180]})
+    a0.lat.attrs['units'] = 'degrees_north'
+    a0.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a0, a0)
+
+    assert isinstance(r.data, dask.array.Array)

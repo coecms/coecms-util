@@ -16,6 +16,8 @@ setup(
             'scipy',
             'numpy',
             'pytest',
+            'dask[array]',
+            'sparse',
             ],
         entry_points = {
             'console_scripts': [
