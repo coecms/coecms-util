@@ -60,6 +60,19 @@ def compare_regrids(tmpdir, source, target):
 
     numpy.testing.assert_array_equal(cdo['var'].data[...], cms.data[...])
 
+def test_call_regrid(tmpdir):
+    a0 = xarray.DataArray(
+        [[0,1],[2,3]],
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': [-45,45], 'lon': [0, 180]})
+    a0.lat.attrs['units'] = 'degrees_north'
+    a0.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a0, a0, 'bilinear')
+
+    assert r is not None
+
 
 def test_compare_regrids(tmpdir):
 
@@ -68,6 +81,8 @@ def test_compare_regrids(tmpdir):
             name='var',
             dims=['lat','lon'],
             coords={'lat': [-45,45], 'lon': [0, 180]})
+    a0.lat.attrs['units'] = 'degrees_north'
+    a0.lon.attrs['units'] = 'degrees_east'
 
     compare_regrids(tmpdir.mkdir('a0a0'), a0, a0)
 
@@ -76,5 +91,7 @@ def test_compare_regrids(tmpdir):
             name='var',
             dims=['lat','lon'],
             coords={'lat': [-90,0,90], 'lon': [0, 90, 180, 270]})
+    a1.lat.attrs['units'] = 'degrees_north'
+    a1.lon.attrs['units'] = 'degrees_east'
 
     compare_regrids(tmpdir.mkdir('a1a1'), a1, a1)

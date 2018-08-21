@@ -10,12 +10,14 @@ run_pytest: &run_pytest
                 bash conda.sh -b -p ~/miniconda
                 ~/miniconda/bin/conda config --system --add channels conda-forge
         - run:
-            name: install
+            name: conda-env
             command: |
                 source ~/miniconda/bin/activate root
                 conda create -n coecms python=${PYTHON_VER} pytest coverage pytest-cov codecov
                 conda env update -n coecms -f conda/dev-environment.yml
-
+        - run:
+            name: install
+            command: |
                 source ~/miniconda/bin/activate coecms
                 pip install -e .[test]
         - run:

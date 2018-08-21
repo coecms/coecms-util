@@ -15,6 +15,7 @@ setup(
             'netcdf4',
             'scipy',
             'numpy',
+            'pytest',
             ],
         entry_points = {
             'console_scripts': [
