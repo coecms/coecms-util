@@ -37,7 +37,15 @@ def identify_grid(dataset):
 
     if isinstance(dataset, Grid):
         return dataset
-    
+
+    try:
+        if dataset.attrs['conventions'] == 'SCRIP':
+            return ScripGrid(dataset)
+    except KeyError:
+        pass
+    except AttributeError:
+        pass
+
     try:
         if dataset.lon.ndim == 1 and dataset.lat.ndim == 1:
             return LonLatGrid(lons=dataset.lon, lats=dataset.lat)
@@ -167,3 +175,15 @@ class LonLatGrid(Grid):
         scrip.to_netcdf(outfile)
 
 
+class ScripGrid(Grid):
+    def __init__(self, grid):
+        self._grid = grid
+
+    def to_cdo_grid(self, outfile):
+        self._grid.to_netcdf(outfile)
+
+    def to_netcdf(self, outfile):
+        self._grid.to_netcdf(outfile)
+
+    def to_scrip(self, outfile):
+        self._grid.to_netcdf(outfile)

@@ -73,6 +73,24 @@ def test_call_regrid(tmpdir):
 
     assert r is not None
 
+def test_manual_weights(tmpdir):
+    """
+    'regrid' will accept a SCRIP format weights file as the target
+    """
+    a0 = xarray.DataArray(
+        [[0,1],[2,3]],
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': [-45,45], 'lon': [0, 180]})
+    a0.lat.attrs['units'] = 'degrees_north'
+    a0.lon.attrs['units'] = 'degrees_east'
+
+    grid = identify_grid(a0)
+    weights = cdo_generate_weights(a0, grid, 'bilinear')
+
+    r = regrid(a0, weights=weights)
+
+    assert r is not None
 
 def test_compare_regrids(tmpdir):
 

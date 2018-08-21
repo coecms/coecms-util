@@ -15,7 +15,7 @@
 # limitations under the License.
 from __future__ import print_function
 
-from coecms.grid import identify_grid
+from .grid import *
 
 import subprocess
 import xarray
@@ -25,12 +25,12 @@ import scipy.sparse
 import sys
 
 
-def cdo_generate_weights(source_data, target_grid, method):
+def cdo_generate_weights(source_grid, target_grid, method):
     """
     Generate weights for regridding using CDO
 
     Args:
-        source_data (xarray.Dataset): Source dataset
+        source_grid (xarray.Dataset): Source dataset
         target_grid (string): Path to file containing the target grid
             description
         method: Regridding method
@@ -39,18 +39,18 @@ def cdo_generate_weights(source_data, target_grid, method):
         xarray.Dataset: Regridding weights
     """
 
-    source_data_file = tempfile.NamedTemporaryFile()
+    source_grid_file = tempfile.NamedTemporaryFile()
     target_grid_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
 
     try:
-        identify_grid(source_data).to_netcdf(source_data_file.name)
-        identify_grid(target_grid).to_cdo_grid(target_grid_file)
+        source_grid.to_netcdf(source_grid_file.name)
+        target_grid.to_cdo_grid(target_grid_file)
 
         subprocess.check_output([
             "cdo",
             "genbil,%s"%target_grid_file.name,
-            source_data_file.name,
+            source_grid_file.name,
             weight_file.name],
             stderr=subprocess.PIPE)
 
@@ -63,7 +63,7 @@ def cdo_generate_weights(source_data, target_grid, method):
         raise
 
     finally:
-        source_data_file.close()
+        source_grid_file.close()
         target_grid_file.close()
         weight_file.close()
 
@@ -100,14 +100,29 @@ class Regridder(object):
     """
     Set up the regridding operation
 
+    For large grids you may wish to pre-calculate the weights using ESMF_RegridWeightGen, if not supplied weights will
+    be calculated using CDO.
+
     Args:
         source_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Source grid / sample dataset
         target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
+        weights (xarray.Dataset): Pre-computed interpolation weights
         method: Regridding method
     """
 
-    def __init__(self, source_grid, target_grid, method):
-        self._weights = cdo_generate_weights(source_grid, target_grid, method)
+    def __init__(self, source_grid, target_grid=None, weights=None, method='bilinear'):
+
+        if target_grid is None and weights is None:
+            raise Exception("Either weights or target_grid must be supplied")
+
+        # Is there already a weights file?
+        if weights is not None:
+            self._weights = weights
+        else:
+            # Generate the weights with CDO
+            _source_grid = identify_grid(source_grid)
+            _target_grid = identify_grid(target_grid)
+            self._weights = cdo_generate_weights(_source_grid, _target_grid, method)
 
 
     def regrid(self, source_data):
@@ -125,7 +140,7 @@ class Regridder(object):
         return apply_weights(source_data, self._weights)
 
 
-def regrid(source_data, target_grid, method):
+def regrid(source_data, target_grid=None, weights=None, method='bilinear'):
     """
     A simple regrid. Inefficient if you are regridding more than one dataset
     to the target grid because it re-generates the weights each time you call
@@ -142,6 +157,6 @@ def regrid(source_data, target_grid, method):
         xarray.Datset: Regridded version of the source dataset
     """
 
-    regridder = Regridder(source_data, target_grid, method)
+    regridder = Regridder(source_data, target_grid=target_grid, weights=weights, method=method)
 
     return regridder.regrid(source_data)
