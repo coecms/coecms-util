@@ -57,8 +57,6 @@ def compare_regrids(tmpdir, source, target):
 
     cms = regrid(source, target, 'bilinear')
 
-    print(cdo['var'].data)
-    print(cms.load())
     numpy.testing.assert_array_equal(cdo['var'].data[...], cms.data[...])
 
 def test_call_regrid(tmpdir):
