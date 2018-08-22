@@ -130,13 +130,26 @@ def test_dask_regrid(tmpdir):
 
 def test_3d_regrid(tmpdir):
     a0 = xarray.DataArray(
-        [[[0,1],[2,3]], [[4,5],[6,7]]],
+        [[[0,1],[2,3]], [[4,5],[6,7]], [[8,9],[10,11]]],
         name='var',
         dims=['time','lat','lon'],
-        coords={'lat': [-45,45], 'lon': [0, 180], 'time': [0,1]})
+        coords={'lat': [-45,45], 'lon': [0, 180], 'time': [0,1,2]})
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
 
     r = regrid(a0, a0)
 
     compare_regrids(tmpdir.mkdir('3d'), a0, a0)
+
+def test_latlon_dims():
+    a0 = xarray.DataArray(
+        [[0,1],[2,3]],
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': [-45,45], 'lon': [0, 180]})
+    a0.lat.attrs['units'] = 'degrees_north'
+    a0.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a0,a0)
+
+    assert r.lat.ndim == 1

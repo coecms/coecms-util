@@ -16,6 +16,7 @@
 from __future__ import print_function
 
 from .grid import *
+from .dimension import remove_degenerate_axes
 
 import subprocess
 import xarray
@@ -105,7 +106,12 @@ def apply_weights(source_data, weights):
     out.coords['lat'] = lat.stack(latlon=('i','j'))
     out.coords['lon'] = lon.stack(latlon=('i','j'))
 
-    return out.unstack('latlon')
+    unstacked_out = out.unstack('latlon')
+
+    unstacked_out.coords['lat'] = remove_degenerate_axes(unstacked_out.lat)
+    unstacked_out.coords['lon'] = remove_degenerate_axes(unstacked_out.lon)
+
+    return unstacked_out
 
 
 class Regridder(object):
