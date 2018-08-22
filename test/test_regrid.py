@@ -57,6 +57,8 @@ def compare_regrids(tmpdir, source, target):
 
     cms = regrid(source, target, 'bilinear')
 
+    print(cdo['var'].data)
+    print(cms.load())
     numpy.testing.assert_array_equal(cdo['var'].data[...], cms.data[...])
 
 def test_call_regrid(tmpdir):
@@ -127,3 +129,16 @@ def test_dask_regrid(tmpdir):
     r = regrid(a0, a0)
 
     assert isinstance(r.data, dask.array.Array)
+
+def test_3d_regrid(tmpdir):
+    a0 = xarray.DataArray(
+        [[[0,1],[2,3]], [[4,5],[6,7]]],
+        name='var',
+        dims=['time','lat','lon'],
+        coords={'lat': [-45,45], 'lon': [0, 180], 'time': [0,1]})
+    a0.lat.attrs['units'] = 'degrees_north'
+    a0.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a0, a0)
+
+    compare_regrids(tmpdir.mkdir('3d'), a0, a0)

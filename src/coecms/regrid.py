@@ -30,8 +30,8 @@ def cdo_generate_weights(source_grid, target_grid, method):
     Generate weights for regridding using CDO
 
     Args:
-        source_grid (xarray.Dataset): Source dataset
-        target_grid (string): Path to file containing the target grid
+        source_grid (xarray.Dataset): Source grid
+        target_grid (xarray.Dataset): Target grid
             description
         method: Regridding method
 
@@ -92,12 +92,20 @@ def apply_weights(source_data, weights):
     lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data[::-1], order='F'),
             name='lon', attrs = w.dst_grid_center_lon.attrs, dims=['i','j'])
 
-    data = dask.array.matmul(source_data.data.reshape(-1), weight_matrix)
+    stacked_source = source_data.stack(latlon=('lat','lon'))
 
-    data = data.reshape(w.dst_grid_dims.data[::-1])
+    data = dask.array.matmul(stacked_source.data, weight_matrix)
 
-    return xarray.DataArray(data, dims=['i', 'j'], coords={'lat': lat, 'lon': lon},
-            name=source_data.name, attrs=source_data.attrs)
+    out = xarray.DataArray(data,
+                           dims=stacked_source.dims,
+                           coords={k:v for k, v in stacked_source.coords.items() if k != 'latlon'},
+                           name=source_data.name,
+                           attrs=source_data.attrs)
+
+    out.coords['lat'] = lat.stack(latlon=('i','j'))
+    out.coords['lon'] = lon.stack(latlon=('i','j'))
+
+    return out.unstack('latlon')
 
 
 class Regridder(object):
