@@ -51,7 +51,7 @@ def cdo_generate_weights(source_grid, target_grid, method):
 
         subprocess.check_output([
             "cdo",
-            "genbil,%s"%target_grid_file.name,
+            "genbil,%s" % target_grid_file.name,
             source_grid_file.name,
             weight_file.name],
             stderr=subprocess.PIPE)
@@ -70,7 +70,6 @@ def cdo_generate_weights(source_grid, target_grid, method):
         weight_file.close()
 
 
-
 def apply_weights(source_data, weights):
     """
     Apply the CDO weights ``weights`` to ``source_data``, performing a regridding operation
@@ -87,28 +86,28 @@ def apply_weights(source_data, weights):
 
     # Use sparse instead of scipy as it behaves with Dask
     weight_matrix = sparse.COO([w.src_address.data - 1, w.dst_address.data - 1],
-                               w.remap_matrix[:,0],
+                               w.remap_matrix[:, 0],
                                shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
                                )
 
     lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data[::-1], order='C'),
-            name='lat', attrs = w.dst_grid_center_lat.attrs, dims=['i','j'])
+                           name='lat', attrs=w.dst_grid_center_lat.attrs, dims=['i', 'j'])
 
     lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data[::-1], order='C'),
-            name='lon', attrs = w.dst_grid_center_lon.attrs, dims=['i','j'])
+                           name='lon', attrs=w.dst_grid_center_lon.attrs, dims=['i', 'j'])
 
-    stacked_source = source_data.stack(latlon=('lat','lon'))
+    stacked_source = source_data.stack(latlon=('lat', 'lon'))
 
     data = dask.array.matmul(stacked_source.data, weight_matrix)
 
     out = xarray.DataArray(data,
                            dims=stacked_source.dims,
-                           coords={k:v for k, v in stacked_source.coords.items() if k != 'latlon'},
+                           coords={k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
                            name=source_data.name,
                            attrs=source_data.attrs)
 
-    out.coords['lat'] = lat.stack(latlon=('i','j'))
-    out.coords['lon'] = lon.stack(latlon=('i','j'))
+    out.coords['lat'] = lat.stack(latlon=('i', 'j'))
+    out.coords['lon'] = lon.stack(latlon=('i', 'j'))
 
     unstacked_out = out.unstack('latlon')
 
@@ -153,7 +152,6 @@ class Regridder(object):
             _source_grid = identify_grid(source_grid)
             _target_grid = identify_grid(target_grid)
             self.weights = cdo_generate_weights(_source_grid, _target_grid, method)
-
 
     def regrid(self, source_data):
         """

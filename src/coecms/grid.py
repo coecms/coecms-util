@@ -23,13 +23,14 @@ import numpy
 Different grid types
 """
 
+
 def identify_grid(dataset):
     """
     Identify the grid used by a Dataset. Returns the appropriate :class:`Grid`
     object
 
     Args:
-        dataset (xarray.Dataset): Input dataset
+        dataset (xarray.DataArray): Input dataset
 
     Returns:
         Grid: Grid for that dataset
@@ -58,7 +59,6 @@ def identify_grid(dataset):
 class Grid(ABC):
     """Abstract base class for grids"""
 
-
     @abstractmethod
     def to_cdo_grid(self, outfile):
         """
@@ -68,7 +68,6 @@ class Grid(ABC):
         Args:
             outfile: File-like object to write to
         """
-
 
     @abstractmethod
     def to_netcdf(self, outfile):
@@ -81,7 +80,6 @@ class Grid(ABC):
         Note that if `outfile` is a file object it will be closed
         automatically.
         """
-
 
     def to_scrip(self, outfile):
         """
@@ -100,6 +98,7 @@ class LonLatGrid(Grid):
     """
     A cartesian grid, with lats and lons one dimensional arrays
     """
+
     def __init__(self, lats, lons):
         """
         Args:
@@ -113,39 +112,36 @@ class LonLatGrid(Grid):
         if self.lats.ndim != 1 or self.lons.ndim != 1:
             raise Exception("Lons and Lats must be 1D")
 
-    
     def to_cdo_grid(self, outfile):
         outfile.write('gridtype = lonlat\n'.encode())
 
-        outfile.write(('xsize = %d\n'%len(self.lons)).encode())
-        outfile.write(('xvals = %s\n'%(','.join(['%f'%x for x in self.lons]))).encode())
+        outfile.write(('xsize = %d\n' % len(self.lons)).encode())
+        outfile.write(('xvals = %s\n' % (','.join(['%f' % x for x in self.lons]))).encode())
 
-        outfile.write(('ysize = %d\n'%len(self.lats)).encode())
-        outfile.write(('yvals = %s\n'%(','.join(['%f'%x for x in self.lats]))).encode())
+        outfile.write(('ysize = %d\n' % len(self.lats)).encode())
+        outfile.write(('yvals = %s\n' % (','.join(['%f' % x for x in self.lats]))).encode())
 
         outfile.flush()
 
-
     def to_netcdf(self, outfile):
-        ds = xarray.DataArray(data=numpy.zeros((len(self.lats), len(self.lons))), 
-                coords=[('lat', self.lats), ('lon', self.lons)])
+        ds = xarray.DataArray(data=numpy.zeros((len(self.lats), len(self.lons))),
+                              coords=[('lat', self.lats), ('lon', self.lons)])
         ds.lat.attrs['units'] = 'degrees_north'
         ds.lon.attrs['units'] = 'degrees_east'
         ds.to_netcdf(outfile)
-
 
     def to_scrip(self, outfile):
         lat = self.lats
         lon = self.lons % 360
 
-        top = (lat.shift(lat=-1)+lat)/2.0
+        top = (lat.shift(lat=-1) + lat) / 2.0
         top[-1] = 90
 
-        bot = (lat.shift(lat=1) + lat)/2.0
+        bot = (lat.shift(lat=1) + lat) / 2.0
         bot[0] = -90
 
-        left  = ((lon - (lon - lon.roll(lon=1).values)%360)/2.0) % 360
-        right = (lon + ((lon.roll(lon=-1).values-lon)%360)/2.0) % 360
+        left = ((lon - (lon - lon.roll(lon=1).values) % 360) / 2.0) % 360
+        right = (lon + ((lon.roll(lon=-1).values - lon) % 360) / 2.0) % 360
 
         center_lon, center_lat = numpy.meshgrid(lon, lat)
 
@@ -158,14 +154,14 @@ class LonLatGrid(Grid):
         corner_lon = numpy.array([x.reshape(-1) for x in [corner_lon0, corner_lon1, corner_lon2, corner_lon3]])
 
         scrip = xarray.Dataset(
-                coords = {
-                    'grid_dims': (['grid_rank'], [lon.size,lat.size]),
-                    'grid_center_lat': (['grid_size'], center_lat.reshape(-1)),
-                    'grid_center_lon': (['grid_size'], center_lon.reshape(-1)),
-                    'grid_imask': (['grid_size'], numpy.ones(center_lat.size)),
-                    'grid_corner_lat': (['grid_size', 'grid_corners'], corner_lat.T),
-                    'grid_corner_lon': (['grid_size', 'grid_corners'], corner_lon.T),
-                    })
+            coords={
+                'grid_dims': (['grid_rank'], [lon.size, lat.size]),
+                'grid_center_lat': (['grid_size'], center_lat.reshape(-1)),
+                'grid_center_lon': (['grid_size'], center_lon.reshape(-1)),
+                'grid_imask': (['grid_size'], numpy.ones(center_lat.size)),
+                'grid_corner_lat': (['grid_size', 'grid_corners'], corner_lat.T),
+                'grid_corner_lon': (['grid_size', 'grid_corners'], corner_lon.T),
+            })
 
         scrip.grid_center_lat.attrs['units'] = 'degrees_north'
         scrip.grid_center_lon.attrs['units'] = 'degrees_east'

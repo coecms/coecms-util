@@ -18,13 +18,14 @@ from coecms.dimension import *
 import xarray
 import numpy
 
+
 def test_remove_degenerate_axes():
-    a = xarray.DataArray([1,2], dims=['i'])
+    a = xarray.DataArray([1, 2], dims=['i'])
     o = remove_degenerate_axes(a)
 
     numpy.testing.assert_array_equal(a.data, o.data)
 
-    b = xarray.DataArray([[1,2],[1,2]], dims=['i','j'])
+    b = xarray.DataArray([[1, 2], [1, 2]], dims=['i', 'j'])
     o = remove_degenerate_axes(b)
 
-    numpy.testing.assert_array_equal([1,2], o.data)
+    numpy.testing.assert_array_equal([1, 2], o.data)

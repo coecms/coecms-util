@@ -16,6 +16,7 @@
 
 import numpy
 
+
 def remove_degenerate_axes(coord):
     """
     Remove any degenerate axes from the coordinate, where all the values along a dimension are identical
@@ -28,7 +29,7 @@ def remove_degenerate_axes(coord):
     """
 
     for d in coord.dims:
-        if numpy.allclose(coord.isel({d:0}), coord.mean(dim=d)):
+        if numpy.allclose(coord.isel({d: 0}), coord.mean(dim=d)):
             coord = coord.mean(dim=d)
 
     return coord
