@@ -143,13 +143,72 @@ def test_3d_regrid(tmpdir):
 
 def test_latlon_dims():
     a0 = xarray.DataArray(
-        [[0,1],[2,3]],
+        numpy.zeros((2,4)),
         name='var',
         dims=['lat','lon'],
-        coords={'lat': [-45,45], 'lon': [0, 180]})
+        coords={'lat': [-45,45], 'lon': [0, 90, 180, 270]})
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
 
     r = regrid(a0,a0)
 
     assert r.lat.ndim == 1
+    assert r.lon.ndim == 1
+    assert r.lat.shape == (2,)
+    assert r.lon.shape == (4,)
+
+    a1 = xarray.DataArray(
+        numpy.zeros((2,4)),
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': [-45,45], 'lon': [-180, -90, 0, 90]})
+    a1.lat.attrs['units'] = 'degrees_north'
+    a1.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a0,a1)
+
+    assert r.lat.ndim == 1
+    assert r.lon.ndim == 1
+    assert r.lat.shape == (2,)
+    assert r.lon.shape == (4,)
+
+    a2 = xarray.DataArray(
+        numpy.zeros((10,10)),
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': numpy.linspace(-90, 90,10), 'lon': numpy.linspace(-180,180,10,endpoint=False)})
+    a2.lat.attrs['units'] = 'degrees_north'
+    a2.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a1,a2)
+
+    assert r.lat.ndim == 1
+    assert r.lon.ndim == 1
+    assert r.lat.shape == (10,)
+    assert r.lon.shape == (10,)
+
+def test_big_array():
+    alats = 145
+    alons = 192
+    ats = 1
+
+    a = xarray.DataArray(
+        numpy.zeros((ats, alats,alons)),
+        name='var',
+        dims=['t','lat','lon'],
+        coords={'lat': numpy.linspace(-90, 90,alats), 'lon': numpy.linspace(0,360,alons,endpoint=False)})
+    a.lat.attrs['units'] = 'degrees_north'
+    a.lon.attrs['units'] = 'degrees_east'
+
+    blats = 10
+    blons = 10
+
+    b = xarray.DataArray(
+        numpy.zeros((blats,blons)),
+        name='var',
+        dims=['lat','lon'],
+        coords={'lat': numpy.linspace(-90, 90,blats), 'lon': numpy.linspace(-180,180,blons,endpoint=False)})
+    b.lat.attrs['units'] = 'degrees_north'
+    b.lon.attrs['units'] = 'degrees_east'
+
+    r = regrid(a,b)

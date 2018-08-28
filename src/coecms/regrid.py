@@ -24,6 +24,7 @@ import sparse
 import dask.array
 import tempfile
 import sys
+import math
 
 
 def cdo_generate_weights(source_grid, target_grid, method):
@@ -85,12 +86,15 @@ def apply_weights(source_data, weights):
     w = weights
 
     # Use sparse instead of scipy as it behaves with Dask
-    weight_matrix = sparse.COO([w.src_address.data - 1, w.dst_address.data - 1], w.remap_matrix[:,0])
+    weight_matrix = sparse.COO([w.src_address.data - 1, w.dst_address.data - 1],
+                               w.remap_matrix[:,0],
+                               shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
+                               )
 
-    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data[::-1], order='F'),
+    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data[::-1], order='C'),
             name='lat', attrs = w.dst_grid_center_lat.attrs, dims=['i','j'])
 
-    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data[::-1], order='F'),
+    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data[::-1], order='C'),
             name='lon', attrs = w.dst_grid_center_lon.attrs, dims=['i','j'])
 
     stacked_source = source_data.stack(latlon=('lat','lon'))
@@ -110,6 +114,14 @@ def apply_weights(source_data, weights):
 
     unstacked_out.coords['lat'] = remove_degenerate_axes(unstacked_out.lat)
     unstacked_out.coords['lon'] = remove_degenerate_axes(unstacked_out.lon)
+
+    unstacked_out.coords['lat'] = unstacked_out.lat / math.pi * 180.0
+    unstacked_out.coords['lon'] = unstacked_out.lon / math.pi * 180.0
+
+    unstacked_out.coords['lat'].attrs['units'] = 'degrees_north'
+    unstacked_out.coords['lat'].attrs['standard_name'] = 'latitude'
+    unstacked_out.coords['lon'].attrs['units'] = 'degrees_east'
+    unstacked_out.coords['lon'].attrs['standard_name'] = 'longitude'
 
     return unstacked_out
 
@@ -135,12 +147,12 @@ class Regridder(object):
 
         # Is there already a weights file?
         if weights is not None:
-            self._weights = weights
+            self.weights = weights
         else:
             # Generate the weights with CDO
             _source_grid = identify_grid(source_grid)
             _target_grid = identify_grid(target_grid)
-            self._weights = cdo_generate_weights(_source_grid, _target_grid, method)
+            self.weights = cdo_generate_weights(_source_grid, _target_grid, method)
 
 
     def regrid(self, source_data):
@@ -155,7 +167,7 @@ class Regridder(object):
             xarray.Datset: Regridded version of the source dataset
         """
 
-        return apply_weights(source_data, self._weights)
+        return apply_weights(source_data, self.weights)
 
 
 def regrid(source_data, target_grid=None, method='bilinear', weights=None):
