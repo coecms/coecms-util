@@ -19,6 +19,7 @@ requirements:
         - scipy
         - numpy
         - cdo
+        - sparse
 
 test:
     requires:
