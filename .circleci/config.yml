@@ -6,7 +6,7 @@ run_pytest: &run_pytest
             name: install
             command: |
                 source venv/bin/activate
-                pip install pytest coverage pytest-cov codecov
+                pip install pytest coverage pytest-cov codecov codacy-coverage
                 pip install -e .[test]
         - run:
             name: test
@@ -15,6 +15,7 @@ run_pytest: &run_pytest
                 mkdir -p test-report/pytest
                 py.test --cov=coecms --cov-report xml
                 codecov
+                python-codacy-coverage -r coverage.xml
 
 run_conda: &run_conda
     docker:
