@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import print_function
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
+import six
 import xarray
 import numpy
 
@@ -56,7 +57,8 @@ def identify_grid(dataset):
     raise NotImplementedError
 
 
-class Grid(ABC):
+@six.add_metaclass(ABCMeta)
+class Grid(object):
     """Abstract base class for grids"""
 
     @abstractmethod

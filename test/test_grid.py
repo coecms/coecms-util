@@ -29,7 +29,7 @@ def test_latlon_grid_to_scrip(tmpdir):
     center_lon, center_lat = numpy.meshgrid(d.lon, d.lat)
     d[:, :] = center_lon
 
-    f = tmpdir.join('scrip.nc')
+    f = str(tmpdir.join('scrip.nc'))
     identify_grid(d).to_scrip(f)
 
     s = xarray.open_dataset(f)

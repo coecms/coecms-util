@@ -44,14 +44,14 @@ def compare_regrids(tmpdir, source, target):
 
     grid = identify_grid(target)
     gridfile = tmpdir.join('grid')
-    with open(gridfile, 'wb') as f:
+    with open(str(gridfile), 'wb') as f:
         grid.to_cdo_grid(f)
 
     sourcefile = tmpdir.join('source.nc')
     source.to_netcdf(str(sourcefile))
 
     outfile = tmpdir.join('out.nc')
-    subprocess.check_call(['cdo', 'remapbil,%s' % gridfile, sourcefile, outfile])
+    subprocess.check_call(['cdo', 'remapbil,%s' % str(gridfile), str(sourcefile), str(outfile)])
 
     cdo = xarray.open_dataset(str(outfile))
 
