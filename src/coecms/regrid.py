@@ -116,7 +116,7 @@ def apply_weights(source_data, weights):
     # With the horizontal grid as a 1d array in the last dimension,
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
-    data = dask.array.matmul(stacked_source.data, weight_matrix)
+    data = dask.array.matmul(stacked_source.data, weight_matrix.todense())
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
