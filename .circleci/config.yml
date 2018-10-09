@@ -42,7 +42,7 @@ run_conda: &run_conda
             name: setup
             command: |
                 ~/miniconda/bin/conda install --yes conda-build conda-verify anaconda-client
-                ~/miniconda/bin/conda config --system --add channels conda-forge
+                ~/miniconda/bin/conda config --system --add channels coecms conda-forge
         - run:
             name: build
             command: |
