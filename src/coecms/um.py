@@ -23,7 +23,7 @@ import xarray
 import dask.array
 
 
-def create_surface_ancillary(input_ds, output_filename, stash_map):
+def create_surface_ancillary(input_ds, stash_map):
     """Create a surface-level UM ancillary file
 
     Args:
