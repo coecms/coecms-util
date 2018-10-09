@@ -15,6 +15,8 @@
 # limitations under the License.
 from __future__ import print_function
 
+from coecms.dimension import identify_lat_lon, identify_time
+
 import mule
 import numpy
 import xarray
@@ -27,10 +29,10 @@ def create_surface_ancillary(input_ds, output_filename, stash_map):
     Args:
         input_ds: Source dataset/dataarray
         output_filename: UM ancillary file to create
-        stash_map: Mapping of `input_ds` variable name to STASH code
+        stash_map: Mapping of variable name from `input_ds` to STASH code
 
     Returns:
-        :obj:`mule.AncilFile`: Ancillary file data
+        :obj:`mule.AncilFile` containing ancillary file data, write out with ``.to_file()``
 
     Example:
         ::
@@ -47,9 +49,8 @@ def create_surface_ancillary(input_ds, output_filename, stash_map):
         * Does not compress output
     """
 
-    time = input_ds.initial_time0_hours
-    lat = input_ds.g0_lat_1
-    lon = input_ds.g0_lon_2
+    time = identify_time(input_ds)
+    lat, lon = identify_lat_lon(input_ds)
 
     tstep = (time[1] - time[0]) / numpy.timedelta64(1,'s')
 
@@ -113,7 +114,7 @@ def create_surface_ancillary(input_ds, output_filename, stash_map):
         # Mask out NANs with MDI
         var_data = xarray.where(dask.array.isnan(input_ds[var]), MDI, input_ds[var])
 
-        for t in var_data.initial_time0_hours:
+        for t in var_data[time.name]:
             field = mule.Field3.empty()
 
             field.lbyr = t.dt.year.values
@@ -149,7 +150,7 @@ def create_surface_ancillary(input_ds, output_filename, stash_map):
             field.bmdi = MDI
             field.bmks = 1.0
 
-            field.set_data_provider(mule.ArrayDataProvider(var_data.sel(initial_time0_hours = t)))
+            field.set_data_provider(mule.ArrayDataProvider(var_data.sel({time.name: t})))
 
             ancil.fields.append(field)
 
