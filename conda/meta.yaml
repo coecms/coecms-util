@@ -29,3 +29,8 @@ test:
         - py.test
     imports:
         - coecms
+
+about:
+    home: https://github.com/coecms/coecms-util
+    license: Apache 2.0
+    license_file: LICENSE
