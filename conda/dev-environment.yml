@@ -1,6 +1,7 @@
 name: coecms
 
 channels:
+    - coecms
     - conda-forge
     - defaults
 
@@ -8,3 +9,4 @@ dependencies:
     - python
     - pytest
     - sphinx
+    - mule

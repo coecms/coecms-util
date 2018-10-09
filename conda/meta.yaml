@@ -14,6 +14,10 @@ requirements:
         - python
     run:
         - python
+        - cfunits
+        - mule
+        - xarray
+        - dask
 
 test:
     requires:
