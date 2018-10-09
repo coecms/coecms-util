@@ -14,7 +14,7 @@ setup(
             'cfunits',
             'mule',
             'xarray',
-            'dask',
+            'dask[array]',
             'netCDF4',
             ],
         entry_points = {
