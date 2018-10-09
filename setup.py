@@ -15,6 +15,7 @@ setup(
             'mule',
             'xarray',
             'dask',
+            'netCDF4',
             ],
         entry_points = {
             'console_scripts': [
