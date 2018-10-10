@@ -13,8 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
 
 from coecms.dimension import *
+
+import pytest
 import xarray
 import numpy
 
@@ -29,3 +32,38 @@ def test_remove_degenerate_axes():
     o = remove_degenerate_axes(b)
 
     numpy.testing.assert_array_equal([1, 2], o.data)
+
+
+def test_identify_lat_lon():
+    da = xarray.DataArray([[0, 0], [0, 0]],
+                          coords=[('lat', [0, 1]), ('lon', [0, 1])])
+
+    # Missing CF metadata is an error
+    with pytest.raises(Exception):
+        lat, lon = identify_lat_lon(da)
+
+    # Should find units, axis or standard_name attributes
+    da.lat.attrs['units'] = 'degrees_north'
+    da.lon.attrs['axis'] = 'X'
+    lat, lon = identify_lat_lon(da)
+    assert lat.equals(da.lat)
+    assert lon.equals(da.lon)
+
+
+def test_identify_time():
+    da = xarray.DataArray([0, 0],
+                          coords=[('time', [0, 1])])
+
+    # Missing CF metadata is an error
+    with pytest.raises(Exception):
+        time = identify_time(da)
+
+    # Units should be identified
+    da.time.attrs['units'] = 'days since 2006-01-09'
+    time = identify_time(da)
+    assert time.equals(da.time)
+
+    # Units should work with CF decoding
+    da = xarray.decode_cf(xarray.Dataset({'da': da})).da
+    time = identify_time(da)
+    assert time.equals(da.time)

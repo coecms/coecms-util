@@ -12,6 +12,10 @@ Welcome to CLEX CMS Utility Library's documentation!
 
    api/grid.rst
    api/regrid.rst
+   api/dimension.rst
+
+   api/um.rst
+
 
 Indices and tables
 ==================

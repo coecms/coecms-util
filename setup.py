@@ -11,13 +11,15 @@ setup(
         cmdclass=versioneer.get_cmdclass(),
 
         install_requires = [
-            'xarray',
-            'netcdf4',
-            'scipy',
+            'cfunits',
+            'dask[array]',
+            'mule',
+            'netCDF4',
             'numpy',
             'pytest',
-            'dask[array]',
+            'scipy',
             'sparse',
+            'xarray',
             ],
         entry_points = {
             'console_scripts': [

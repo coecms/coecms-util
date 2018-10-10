@@ -14,13 +14,15 @@ requirements:
         - python
     run:
         - python
-        - netcdf4
-        - xarray
-        - scipy
-        - numpy
         - cdo
+        - cfunits
         - dask
+        - mule
+        - netcdf4
+        - numpy
+        - scipy
         - sparse
+        - xarray
 
 test:
     requires:
@@ -32,3 +34,8 @@ test:
         - py.test
     imports:
         - coecms
+
+about:
+    home: https://github.com/coecms/coecms-util
+    license: APACHE
+    license_file: LICENSE

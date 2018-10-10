@@ -9,6 +9,7 @@ run_pytest: &run_pytest
                 wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O conda.sh
                 bash conda.sh -b -p ~/miniconda
                 ~/miniconda/bin/conda config --system --add channels conda-forge
+                ~/miniconda/bin/conda config --system --add channels coecms
         - run:
             name: conda-env
             command: |
@@ -43,6 +44,7 @@ run_conda: &run_conda
             command: |
                 ~/miniconda/bin/conda install --yes conda-build conda-verify anaconda-client
                 ~/miniconda/bin/conda config --system --add channels conda-forge
+                ~/miniconda/bin/conda config --system --add channels coecms
         - run:
             name: build
             command: |
@@ -54,15 +56,15 @@ version: 2
 jobs:
     python2:
         environment:
-            PYTHON_VER=2
+            PYTHON_VER=2.7
         <<: *run_pytest
     python3:
         environment:
-            PYTHON_VER=3
+            PYTHON_VER=3.6
         <<: *run_pytest
     conda3:
         environment:
-            PYTHON_VER=3
+            PYTHON_VER=3.6
         <<: *run_conda
 
 workflows:
