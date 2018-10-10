@@ -22,8 +22,8 @@ import xarray
 
 
 def test_identify_lat_lon():
-    da = xarray.DataArray([[0,0],[0,0]],
-            coords=[('lat', [0,1]), ('lon', [0,1])])
+    da = xarray.DataArray([[0, 0], [0, 0]],
+                          coords=[('lat', [0, 1]), ('lon', [0, 1])])
 
     # Missing CF metadata is an error
     with pytest.raises(Exception):
@@ -38,8 +38,8 @@ def test_identify_lat_lon():
 
 
 def test_identify_time():
-    da = xarray.DataArray([0,0],
-            coords=[('time', [0,1])])
+    da = xarray.DataArray([0, 0],
+                          coords=[('time', [0, 1])])
 
     # Missing CF metadata is an error
     with pytest.raises(Exception):
@@ -54,4 +54,3 @@ def test_identify_time():
     da = xarray.decode_cf(xarray.Dataset({'da': da})).da
     time = identify_time(da)
     assert time.equals(da.time)
-

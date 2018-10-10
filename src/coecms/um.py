@@ -32,7 +32,8 @@ def create_surface_ancillary(input_ds, stash_map):
         stash_map: Mapping of variable name from `input_ds` to STASH code
 
     Returns:
-        :obj:`mule.AncilFile` containing ancillary file data, write out with ``.to_file()``
+        :obj:`mule.AncilFile` containing ancillary file data, write out with
+        ``.to_file()``
 
     Example:
         ::
@@ -52,7 +53,7 @@ def create_surface_ancillary(input_ds, stash_map):
     time = identify_time(input_ds)
     lat, lon = identify_lat_lon(input_ds)
 
-    tstep = (time[1] - time[0]) / numpy.timedelta64(1,'s')
+    tstep = (time[1] - time[0]) / numpy.timedelta64(1, 's')
 
     template = {
         'fixed_length_header': {
@@ -101,7 +102,7 @@ def create_surface_ancillary(input_ds, stash_map):
             'north_pole_lon': 0,
         },
         'level_dependent_constants': {
-            'dims': (1,None)
+            'dims': (1, None)
         },
     }
 
@@ -112,7 +113,8 @@ def create_surface_ancillary(input_ds, stash_map):
 
     for var, stash in stash_map.items():
         # Mask out NANs with MDI
-        var_data = xarray.where(dask.array.isnan(input_ds[var]), MDI, input_ds[var])
+        var_data = xarray.where(dask.array.isnan(
+            input_ds[var]), MDI, input_ds[var])
 
         for t in var_data[time.name]:
             field = mule.Field3.empty()
@@ -150,7 +152,8 @@ def create_surface_ancillary(input_ds, stash_map):
             field.bmdi = MDI
             field.bmks = 1.0
 
-            field.set_data_provider(mule.ArrayDataProvider(var_data.sel({time.name: t})))
+            field.set_data_provider(
+                mule.ArrayDataProvider(var_data.sel({time.name: t})))
 
             ancil.fields.append(field)
 

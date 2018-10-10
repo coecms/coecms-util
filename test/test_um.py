@@ -20,14 +20,15 @@ from coecms.um import *
 import xarray
 import numpy
 
+
 def test_create_surface_ancillary():
     da = xarray.Dataset(
-            {'sst': (['time','lat','lon'], numpy.zeros((3,3,3)))},
-            coords={
-                'time': ('time',[1,2,3],{'units':'days since 1900-01-01'}),
-                'lat': ('lat',[1,2,3],{'axis':'Y'}),
-                'lon': ('lon',[1,2,3],{'axis':'X'}),
-                })
+        {'sst': (['time', 'lat', 'lon'], numpy.zeros((3, 3, 3)))},
+        coords={
+            'time': ('time', [1, 2, 3], {'units': 'days since 1900-01-01'}),
+            'lat': ('lat', [1, 2, 3], {'axis': 'Y'}),
+            'lon': ('lon', [1, 2, 3], {'axis': 'X'}),
+        })
     da = xarray.decode_cf(da)
 
     ancil = create_surface_ancillary(da, {'sst': 507})

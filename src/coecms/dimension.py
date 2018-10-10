@@ -17,6 +17,7 @@ from __future__ import print_function
 
 from cfunits import Units
 
+
 def identify_lat_lon(dataarray):
     """
     Identify the latitude and longitude dimensions of a dataarray using CF
@@ -37,13 +38,13 @@ def identify_lat_lon(dataarray):
     lon = None
 
     for c in dataarray.coords.values():
-        if (c.attrs.get('standard_name','') == 'latitude'
-                or Units(c.attrs.get('units','')).islatitude
+        if (c.attrs.get('standard_name', '') == 'latitude'
+                or Units(c.attrs.get('units', '')).islatitude
                 or c.attrs.get('axis', '') == 'Y'):
             lat = c
 
-        if (c.attrs.get('standard_name','') == 'longitude'
-                or Units(c.attrs.get('units','')).islongitude
+        if (c.attrs.get('standard_name', '') == 'longitude'
+                or Units(c.attrs.get('units', '')).islongitude
                 or c.attrs.get('axis', '') == 'X'):
             lon = c
 
@@ -68,9 +69,9 @@ def identify_time(dataarray):
     """
 
     for c in dataarray.coords.values():
-        if (c.attrs.get('standard_name','') == 'time'
-                or Units(c.attrs.get('units','')).isreftime
-                or Units(c.encoding.get('units','')).isreftime
+        if (c.attrs.get('standard_name', '') == 'time'
+                or Units(c.attrs.get('units', '')).isreftime
+                or Units(c.encoding.get('units', '')).isreftime
                 or c.attrs.get('axis', '') == 'T'):
             return c
 
