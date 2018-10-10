@@ -10,6 +10,9 @@ Welcome to CLEX CMS Utility Library's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   api/dimension.rst
+
+   api/um.rst
 
 
 Indices and tables

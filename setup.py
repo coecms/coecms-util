@@ -11,6 +11,11 @@ setup(
         cmdclass=versioneer.get_cmdclass(),
 
         install_requires = [
+            'cfunits',
+            'mule',
+            'xarray',
+            'dask[array]',
+            'netCDF4',
             ],
         entry_points = {
             'console_scripts': [

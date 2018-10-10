@@ -14,6 +14,10 @@ requirements:
         - python
     run:
         - python
+        - cfunits
+        - mule
+        - xarray
+        - dask
 
 test:
     requires:
@@ -25,3 +29,8 @@ test:
         - py.test
     imports:
         - coecms
+
+about:
+    home: https://github.com/coecms/coecms-util
+    license: APACHE
+    license_file: LICENSE
