@@ -101,9 +101,6 @@ def create_surface_ancillary(input_ds, stash_map):
             'north_pole_lat': 90,
             'north_pole_lon': 0,
         },
-        'level_dependent_constants': {
-            'dims': (1, None)
-        },
     }
 
     ancil = mule.AncilFile.from_template(template)
