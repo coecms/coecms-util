@@ -16,11 +16,64 @@
 from __future__ import print_function
 
 from coecms.dimension import identify_lat_lon, identify_time
+from coecms.grid import LonLatGrid
 
+import dask.array
 import mule
 import numpy
+import re
 import xarray
-import dask.array
+
+
+def global_grid(resolution, field='T', endgame=None):
+    """Get a global UM grid
+
+    Args:
+        resolution (str): Grid resolution (e.g. 'N96e')
+        field (str): Field type ('T', 'U' or 'V')
+        endgame (bool): Endgame grid (by default true if resolution ends with 'e')
+
+    Returns:
+        :obj:`coecms.grid.Grid` describing the given grid
+    """
+
+    if field not in ['T','U','V']:
+        raise Exception("Invalid field type '%s'"%field)
+
+    m = re.match(r'n(?P<res>\d+)(?P<end>e)?', resolution)
+    if not m:
+        raise Exception("Invalid resolution '%s'"%resolution)
+
+    n = int(m.group('res'))
+
+    if m.group('end'):
+        endgame = True
+
+    if endgame:
+        nx = n * 2
+        ny = n / 2 * 3
+
+        dx = 360.0 / (nx)
+        dy = 180.0 / (ny)
+
+        # Default is 'T' field
+        x0 = dx/2.0
+        y0 = -90.0+dy/2.0
+        
+        if field == 'U':
+            x0 = 0.0
+
+        if field == 'V':
+            ny += 1
+            y0 = -90.0
+
+        lon = x0 + numpy.arange(nx) * dx
+        lat = y0 + numpy.arange(ny) * dy
+
+    else:
+        raise NotImplemented("ND Grids not implemented")
+
+    return LonLatGrid(lats=lat, lons=lon)
 
 
 def create_surface_ancillary(input_ds, stash_map):
@@ -155,3 +208,44 @@ def create_surface_ancillary(input_ds, stash_map):
             ancil.fields.append(field)
 
     return ancil
+
+
+def sstice_erai(begindate, enddate, frequency, um_grid):
+    """Returns a :obj:`mule.AncilFile` with ERA-Interim SST and ice fields
+
+    Args:
+        begindate (:obj:`datetime.date`): Initial date
+        enddate (:obj:`datetime.date`): Final date
+        frequency (:obj:`datetime.timedelta`): Update frequency
+        um_grid (:obj:`coecms.grid.LonLatGrid`): UM Grid
+
+    Returns:
+        :obj:`mule.AncilFile` containing the ERA-Interim fields for the time period interpolated to `grid`
+    """
+    from coecms.datasets import erai
+
+    # Grab the data at the correct times from ERA-Interim 
+    data = erai('oper_an_sfc').sel(time=slice(begindate, enddate)).resample(frequency).asfreq()
+
+    # Regrid to the target UM resolution
+    ds_um = regrid(data, um_grid)
+
+    # Convert to UM format
+    ancil = create_surface_ancillary(ds_um, {'tos': 507, 'sic': 31})
+
+    return ancil
+
+
+def sstice_era5(begindate, enddate, frequency, grid):
+    """Returns a :obj:`mule.AncilFile` with ERA5 SST and ice fields
+
+    Args:
+        begindate (:obj:`datetime.date`): Initial date
+        enddate (:obj:`datetime.date`): Final date
+        frequency (:obj:`datetime.timedelta`): Update frequency
+        grid (:obj:`coecms.grid.LonLatGrid`): UM Grid
+
+    Returns:
+        :obj:`mule.AncilFile` containing the ERA5 fields for the time period interpolated to `grid`
+    """
+    raise NotImplemented

@@ -35,3 +35,41 @@ def test_create_surface_ancillary():
 
     # The file should pass Mule's internal checks
     ancil.validate()
+
+
+def test_global_grid():
+    n96e = global_grid('n96e')
+    assert n96e.lons.size == 192
+    assert n96e.lats.size == 144
+    assert n96e.lons[0] == 0.937500
+    assert n96e.lons[-1] == 359.062500
+    assert n96e.lats[0] == -89.375000
+    assert n96e.lats[-1] == 89.37500
+
+    n96eu = global_grid('n96e','U')
+    assert n96eu.lons.size == 192
+    assert n96eu.lats.size == 144
+    assert n96eu.lons[0] == 0.0
+    assert n96eu.lons[-1] == 358.125000
+    assert n96eu.lats[0] == -89.375000
+    assert n96eu.lats[-1] == 89.37500
+
+    n96ev = global_grid('n96e','V')
+    assert n96ev.lons.size == 192
+    assert n96ev.lats.size == 145
+    assert n96ev.lons[0] == 0.937500
+    assert n96ev.lons[-1] == 359.062500
+    assert n96ev.lats[0] == -90.0
+    assert n96ev.lats[-1] == 90.0
+
+    n216e = global_grid('n216e')
+    assert n216e.lons.size == 432
+    assert n216e.lats.size == 324
+    numpy.testing.assert_almost_equal(n216e.lons[0], 0.416667, decimal=6)
+    numpy.testing.assert_almost_equal(n216e.lons[-1], 359.583333, decimal=6)
+    numpy.testing.assert_almost_equal(n216e.lats[0], -89.722222, decimal=6)
+    numpy.testing.assert_almost_equal(n216e.lats[-1], 89.722222, decimal=6)
+
+
+def test_sstice_erai():
+    ancil = sstice_erai('20010101','20010102','6H', global_grid('n96e'))
