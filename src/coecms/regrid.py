@@ -75,6 +75,40 @@ def cdo_generate_weights(source_grid, target_grid, method):
         weight_file.close()
 
 
+def esmf_generate_weights(source_grid, target_grid, source_mask):
+    # Make some temporary files that we'll feed to ESMF
+    source_file = tempfile.NamedTemporaryFile()
+    target_file = tempfile.NamedTemporaryFile()
+    weight_file = tempfile.NamedTemporaryFile()
+
+    rwg = '/apps/esmf/7.1.0r-intel/bin/binO/Linux.intel.64.openmpi.default/ESMF_RegridWeightGen'
+
+    try:
+        source_grid.to_netcdf(source_file.name, encoding={'tos': {'_FillValue':-9999}})
+        target_grid.to_netcdf(target_file.name)
+
+        out = subprocess.check_output([
+            rwg,
+            '--source', source_file.name,
+            '--destination', target_file.name,
+            '--weight', weight_file.name,
+            '--src_missingvalue', source_mask,
+            '--extrap_method','nearestidavg',
+            '--ignore_unmapped',
+            ],
+            stderr=subprocess.PIPE)
+        print(out.decode('utf-8'))
+
+        weights = xarray.open_dataset(weight_file.name)
+        return weights
+
+    finally:
+        # Clean up the temporary files
+        source_file.close()
+        target_file.close()
+        weight_file.close()
+
+
 def apply_weights(source_data, weights):
     """
     Apply the CDO weights ``weights`` to ``source_data``, performing a regridding operation
@@ -97,18 +131,36 @@ def apply_weights(source_data, weights):
     # array, multiplied by the weights matrix, then unstacked back into a 2d
     # array
 
+    if w.title.startswith('ESMF'):
+        src_address = w.col - 1
+        dst_address = w.row - 1
+        remap_matrix = w.S
+        w_shape = (w.sizes['n_a'], w.sizes['n_b'])
+
+        dst_grid_shape = w.dst_grid_dims.data
+        dst_grid_center_lat = w.yc_b.data.reshape(dst_grid_shape[::-1], order='C')
+        dst_grid_center_lon = w.xc_b.data.reshape(dst_grid_shape[::-1], order='C')
+
+    else:
+        src_address = w.src_address - 1
+        dst_address = w.dst_address - 1
+        remap_matrix = w.remap_matrix[:,0]
+        w_shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
+
+        dst_grid_shape = w.dst_grid_dims.data
+        dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(dst_grid_shape[::-1], order='C')
+        dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(dst_grid_shape[::-1], order='C')
+
     # Use sparse instead of scipy as it behaves better with Dask
-    weight_matrix = sparse.COO([w.src_address.data - 1, w.dst_address.data - 1],
-                               w.remap_matrix[:, 0],
-                               shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
+    weight_matrix = sparse.COO([src_address.data, dst_address.data],
+                               remap_matrix.data,
+                               shape=w_shape,
                                )
 
-    # Grab the target grid lats and lons - these are 1d arrays that we need to reshape to the correct size
-    lat = xarray.DataArray(w.dst_grid_center_lat.data.reshape(w.dst_grid_dims.data[::-1], order='C'),
-                           name='lat', attrs=w.dst_grid_center_lat.attrs, dims=['i', 'j'])
-    lon = xarray.DataArray(w.dst_grid_center_lon.data.reshape(w.dst_grid_dims.data[::-1], order='C'),
-                           name='lon', attrs=w.dst_grid_center_lon.attrs, dims=['i', 'j'])
-
+    # Grab the target grid lats and lons - these are 1d arrays that we need to
+    # reshape to the correct size
+    lat = xarray.DataArray(dst_grid_center_lat, name='lat', dims=['i', 'j'])
+    lon = xarray.DataArray(dst_grid_center_lon, name='lon', dims=['i', 'j'])
 
     # Reshape the source dataset, so that the last dimension is a 1d array over
     # the lats and lons that we can multiply against the weights array
@@ -144,8 +196,8 @@ def apply_weights(source_data, weights):
     unstacked_out.coords['lon'] = remove_degenerate_axes(unstacked_out.lon)
 
     # Convert from radians to degrees
-    unstacked_out.coords['lat'] = unstacked_out.lat / math.pi * 180.0
-    unstacked_out.coords['lon'] = unstacked_out.lon / math.pi * 180.0
+    unstacked_out.coords['lat'] = unstacked_out.lat# / math.pi * 180.0
+    unstacked_out.coords['lon'] = unstacked_out.lon# / math.pi * 180.0
 
     # Add metadata to the coordinates
     unstacked_out.coords['lat'].attrs['units'] = 'degrees_north'
@@ -170,10 +222,10 @@ class Regridder(object):
         method: Regridding method
     """
 
-    def __init__(self, source_grid, target_grid=None, method='bilinear', weights=None):
+    def __init__(self, source_grid=None, target_grid=None, method='bilinear', weights=None):
 
-        if target_grid is None and weights is None:
-            raise Exception("Either weights or target_grid must be supplied")
+        if (source_grid is None or target_grid is None) and weights is None:
+            raise Exception("Either weights or source_grid/target_grid must be supplied")
 
         # Is there already a weights file?
         if weights is not None:
