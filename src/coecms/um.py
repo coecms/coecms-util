@@ -247,13 +247,15 @@ def sstice_erai(begindate, enddate, frequency, um_grid):
             ancil.to_file('sstice.ancil')
     """
     from coecms.datasets import erai
-    from coecms.regrid import Regridder
+    from coecms.regrid import Regridder, esmf_generate_weights
 
     # Grab the data at the correct times from ERA-Interim 
     data = erai('oper_an_sfc').sel(time=slice(begindate, enddate)).resample(time=frequency).asfreq()
 
     # Regrid to the target UM resolution
-    r = Regridder(data.sic, um_grid)
+    data['tos'].encoding['_FillValue'] = -9999
+    w = esmf_generate_weights(data, um_grid, source_mask='tos')
+    r = Regridder(weights=w)
 
     ds_um = xarray.Dataset()
     ds_um['sic'] = r.regrid(data.sic)

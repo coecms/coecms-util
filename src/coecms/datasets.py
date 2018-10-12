@@ -78,17 +78,22 @@ def open_erai_var(months, domain, variable):
 
 
 def erai(dataset):
-    months = pandas.date_range('19790101', date.today(), freq='MS')
+    if dataset == 'fx':
+        return xarray.open_dataset('/g/data1/ub4/erai/netcdf/fx/ei_invariant_075x075_90N0E90S35925E.nc')
+    elif dataset == 'oper_an_sfc':
+        months = pandas.date_range('19790101', date.today(), freq='MS')
 
-    erai_domain_vars = {
-        'ocean': ['tos'],
-        'seaIce': ['sic'],
-        }
+        erai_domain_vars = {
+            'ocean': ['tos'],
+            'seaIce': ['sic'],
+            }
 
-    ds = xarray.Dataset()
+        ds = xarray.Dataset()
 
-    for d, vs in erai_domain_vars.items():
-        for v in vs:
-            ds[v] = open_erai_var(months, d, v)
+        for d, vs in erai_domain_vars.items():
+            for v in vs:
+                ds[v] = open_erai_var(months, d, v)
 
-    return ds
+        return ds
+    else:
+       raise NotImplementedError

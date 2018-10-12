@@ -84,7 +84,7 @@ def esmf_generate_weights(source_grid, target_grid, source_mask):
     rwg = '/apps/esmf/7.1.0r-intel/bin/binO/Linux.intel.64.openmpi.default/ESMF_RegridWeightGen'
 
     try:
-        source_grid.to_netcdf(source_file.name, encoding={'tos': {'_FillValue':-9999}})
+        source_grid.to_netcdf(source_file.name)
         target_grid.to_netcdf(target_file.name)
 
         out = subprocess.check_output([
