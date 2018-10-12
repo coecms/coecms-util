@@ -32,7 +32,7 @@ def open_erai_file_delayed(monstart, monend, domain, variable):
                 'monstart': monstart.strftime('%Y%m%d'),
                 'monend': monend.strftime('%Y%m%d'),
                 })
-    return xarray.open_dataset(path, chunks={})[variable]
+    return xarray.open_dataset(path, chunks={'time': 1})[variable]
 
 
 def open_erai_file(date, domain, variable, mold=None):

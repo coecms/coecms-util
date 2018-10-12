@@ -36,6 +36,14 @@ def test_create_surface_ancillary():
     # The file should pass Mule's internal checks
     ancil.validate()
 
+    # The field grid should match the input grid
+    assert ancil.fields[0].lbnpt == 3
+    assert ancil.fields[0].lbrow == 3
+    assert ancil.fields[0].bdx == 1
+    assert ancil.fields[0].bdy == 1
+    assert ancil.fields[0].bzx == da.lon[0] - 1
+    assert ancil.fields[0].bzy == da.lat[0] - 1
+
 
 def test_global_grid():
     n96e = global_grid('n96e')
@@ -73,3 +81,15 @@ def test_global_grid():
 
 def test_sstice_erai():
     ancil = sstice_erai('20010101','20010102','6H', global_grid('n96e'))
+
+    # Check file resolution
+    numpy.testing.assert_almost_equal(ancil.real_constants.start_lat, -89.375, decimal=6)
+    numpy.testing.assert_almost_equal(ancil.real_constants.start_lon, 0.9375, decimal=6)
+    numpy.testing.assert_almost_equal(ancil.real_constants.col_spacing, 1.875, decimal=6)
+    numpy.testing.assert_almost_equal(ancil.real_constants.row_spacing, 1.25, decimal=6)
+
+    # Check field resolution
+    assert ancil.fields[0].lbnpt == 192
+    assert ancil.fields[0].lbrow == 144
+    numpy.testing.assert_almost_equal(ancil.fields[0].bzx, -0.9375, decimal=6)
+    numpy.testing.assert_almost_equal(ancil.fields[0].bzy, -90.625, decimal=6)

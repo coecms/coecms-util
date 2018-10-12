@@ -91,7 +91,9 @@ def identify_time(dataarray):
         if (c.attrs.get('standard_name', '') == 'time'
                 or Units(c.attrs.get('units', '')).isreftime
                 or Units(c.encoding.get('units', '')).isreftime
-                or c.attrs.get('axis', '') == 'T'):
+                or c.attrs.get('axis', '') == 'T'
+                or c.dtype.kind == 'M'
+                ):
             return c
 
     raise Exception("No time axis found")

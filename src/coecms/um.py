@@ -147,9 +147,9 @@ def create_surface_ancillary(input_ds, stash_map):
             'num_field_types': len(stash_map),
         },
         'real_constants': {
-            'start_lat': lat.values[0] + (lat.values[1] - lat.values[0])/2.0,
+            'start_lat': lat.values[0],# + (lat.values[1] - lat.values[0])/2.0,
             'row_spacing': lat.values[1] - lat.values[0],
-            'start_lon': lon.values[0] + (lon.values[1] - lon.values[0])/2.0,
+            'start_lon': lon.values[0],# + (lon.values[1] - lon.values[0])/2.0,
             'col_spacing': lon.values[1] - lon.values[0],
             'north_pole_lat': 90,
             'north_pole_lon': 0,
@@ -162,11 +162,11 @@ def create_surface_ancillary(input_ds, stash_map):
     MDI = -1073741824.0
 
     for var, stash in stash_map.items():
-        # Mask out NANs with MDI
-        var_data = xarray.where(dask.array.isnan(
-            input_ds[var]), MDI, input_ds[var])
+        # Mask out with MDI
+        #var_data = input_ds[var].filled(MDI)
 
-        for t in var_data[time.name]:
+        for t in input_ds[var][time.name]:
+            print(var, t.data)
             field = mule.Field3.empty()
 
             field.lbyr = t.dt.year.values
@@ -196,18 +196,35 @@ def create_surface_ancillary(input_ds, stash_map):
 
             field.bdx = ancil.real_constants.col_spacing
             field.bdy = ancil.real_constants.row_spacing
-            field.bzx = ancil.real_constants.start_lon - field.bdx / 2.0
-            field.bzy = ancil.real_constants.start_lat - field.bdy / 2.0
+            field.bzx = ancil.real_constants.start_lon - field.bdx
+            field.bzy = ancil.real_constants.start_lat - field.bdy
 
             field.bmdi = MDI
             field.bmks = 1.0
 
-            field.set_data_provider(
-                mule.ArrayDataProvider(var_data.sel({time.name: t})))
+            data = input_ds[var].sel({time.name: t}).data
+            masked_data = dask.array.ma.filled(input_ds[var].sel({time.name: t}).data, MDI)
+
+            field.set_data_provider(FastDataProvider(masked_data))
 
             ancil.fields.append(field)
 
     return ancil
+
+
+class FastDataProvider():
+    """Faster version of mule.ArrayDataProvider
+    
+    Doesn't convert to a numpy array, so works with dask fields
+    """
+    def __init__(self, array):
+        if len(array.shape) != 2:
+            raise Exception
+
+        self._array = array
+
+    def _data_array(self):
+        return self._array.compute()
 
 
 def sstice_erai(begindate, enddate, frequency, um_grid):
@@ -221,14 +238,26 @@ def sstice_erai(begindate, enddate, frequency, um_grid):
 
     Returns:
         :obj:`mule.AncilFile` containing the ERA-Interim fields for the time period interpolated to `grid`
+
+    Example:
+        ::
+        
+            import coecms.um as um
+            ancil = um.sstice_erai('20110906', '20110908', '12H', um.global_grid('n96e'))
+            ancil.to_file('sstice.ancil')
     """
     from coecms.datasets import erai
+    from coecms.regrid import Regridder
 
     # Grab the data at the correct times from ERA-Interim 
-    data = erai('oper_an_sfc').sel(time=slice(begindate, enddate)).resample(frequency).asfreq()
+    data = erai('oper_an_sfc').sel(time=slice(begindate, enddate)).resample(time=frequency).asfreq()
 
     # Regrid to the target UM resolution
-    ds_um = regrid(data, um_grid)
+    r = Regridder(data.sic, um_grid)
+
+    ds_um = xarray.Dataset()
+    ds_um['sic'] = r.regrid(data.sic)
+    ds_um['tos'] = r.regrid(data.tos)
 
     # Convert to UM format
     ancil = create_surface_ancillary(ds_um, {'tos': 507, 'sic': 31})

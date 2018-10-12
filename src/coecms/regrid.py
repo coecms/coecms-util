@@ -25,6 +25,7 @@ import dask.array
 import tempfile
 import sys
 import math
+from datetime import datetime
 
 
 def cdo_generate_weights(source_grid, target_grid, method):
@@ -112,16 +113,18 @@ def apply_weights(source_data, weights):
     # Reshape the source dataset, so that the last dimension is a 1d array over
     # the lats and lons that we can multiply against the weights array
     stacked_source = source_data.stack(latlon=('lat', 'lon'))
+    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
 
     # With the horizontal grid as a 1d array in the last dimension,
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
-    data = dask.array.matmul(stacked_source.data, weight_matrix.todense())
+    data = dask.array.matmul(stacked_source_masked, weight_matrix)
+    mask = dask.array.matmul(dask.array.ma.getmaskarray(stacked_source_masked), weight_matrix)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
     # this stage the horizontal grid is still stacked into one dimension
-    out = xarray.DataArray(data,
+    out = xarray.DataArray(dask.array.ma.masked_array(data, mask=(mask != 0)),
                            dims=stacked_source.dims,
                            coords={k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
                            name=source_data.name,
