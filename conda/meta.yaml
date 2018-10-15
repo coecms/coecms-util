@@ -14,10 +14,15 @@ requirements:
         - python
     run:
         - python
+        - cdo
         - cfunits
-        - mule
-        - xarray
         - dask
+        - mule
+        - netcdf4
+        - numpy
+        - scipy
+        - sparse
+        - xarray
 
 test:
     requires:

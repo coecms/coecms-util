@@ -12,10 +12,14 @@ setup(
 
         install_requires = [
             'cfunits',
-            'mule',
-            'xarray',
             'dask[array]',
+            'mule',
             'netCDF4',
+            'numpy',
+            'pytest',
+            'scipy',
+            'sparse',
+            'xarray',
             ],
         entry_points = {
             'console_scripts': [

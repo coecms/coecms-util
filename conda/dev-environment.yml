@@ -9,6 +9,7 @@ dependencies:
     - python
     - pytest
     - sphinx
+    - cdo
     - mule
     - cfunits
     - dask

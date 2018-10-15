@@ -10,6 +10,8 @@ Welcome to CLEX CMS Utility Library's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   api/grid.rst
+   api/regrid.rst
    api/dimension.rst
 
    api/um.rst

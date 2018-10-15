@@ -19,6 +19,19 @@ from coecms.dimension import *
 
 import pytest
 import xarray
+import numpy
+
+
+def test_remove_degenerate_axes():
+    a = xarray.DataArray([1, 2], dims=['i'])
+    o = remove_degenerate_axes(a)
+
+    numpy.testing.assert_array_equal(a.data, o.data)
+
+    b = xarray.DataArray([[1, 2], [1, 2]], dims=['i', 'j'])
+    o = remove_degenerate_axes(b)
+
+    numpy.testing.assert_array_equal([1, 2], o.data)
 
 
 def test_identify_lat_lon():
