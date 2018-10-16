@@ -26,6 +26,7 @@ import tempfile
 import sys
 import math
 from datetime import datetime
+from shutil import which
 
 
 def cdo_generate_weights(source_grid, target_grid, method):
@@ -75,27 +76,61 @@ def cdo_generate_weights(source_grid, target_grid, method):
         weight_file.close()
 
 
-def esmf_generate_weights(source_grid, target_grid, source_mask):
+def esmf_generate_weights(
+        source_grid,
+        target_grid,
+        method='bilinear',
+        extrap_method='nearestidavg',
+        ):
+    """Generate regridding weights with ESMF
+
+    https://www.earthsystemcog.org/projects/esmf/regridding
+
+    Args:
+        source_grid (:obj:`xarray.Dataarray`): Source grid. If masked the mask
+            will be used in the regridding
+        target_grid (:obj:`xarray.Dataarray`): Target grid. If masked the mask
+            will be used in the regridding
+        method (str): ESMF Regridding method, see ``ESMF_RegridWeightGen --help``
+        extrap_method (str): ESMF Extrapolation method, see ``ESMF_RegridWeightGen --help``
+
+    Returns:
+        :obj:`xarray.Dataset` with regridding information from
+            ESMF_RegridWeightGen
+    """
     # Make some temporary files that we'll feed to ESMF
     source_file = tempfile.NamedTemporaryFile()
     target_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
 
-    rwg = '/apps/esmf/7.1.0r-intel/bin/binO/Linux.intel.64.openmpi.default/ESMF_RegridWeightGen'
+    rwg = 'ESMF_RegridWeightGen'
+
+    if which(rwg) is None:
+        rwg = '/apps/esmf/7.1.0r-intel/bin/binO/Linux.intel.64.openmpi.default/ESMF_RegridWeightGen'
+
+    if '_FillValue' not in source_grid.encoding:
+        source_grid.encoding['_FillValue'] = -999999
+
+    if '_FillValue' not in target_grid.encoding:
+        target_grid.encoding['_FillValue'] = -999999
 
     try:
         source_grid.to_netcdf(source_file.name)
         target_grid.to_netcdf(target_file.name)
 
-        out = subprocess.check_output([
-            rwg,
+        command = [rwg,
             '--source', source_file.name,
             '--destination', target_file.name,
             '--weight', weight_file.name,
-            '--src_missingvalue', source_mask,
-            '--extrap_method','nearestidavg',
+            '--method', method,
+            '--extrap_method', extrap_method,
             '--ignore_unmapped',
-            ],
+            '--src_missingvalue', source_grid.name,
+            '--dst_missingvalue', target_grid.name,
+            '--no-log',
+            ]
+
+        out = subprocess.check_output(args=command,
             stderr=subprocess.PIPE)
         print(out.decode('utf-8'))
 

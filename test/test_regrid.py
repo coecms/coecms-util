@@ -218,3 +218,42 @@ def test_big_array():
     b.lon.attrs['units'] = 'degrees_east'
 
     r = regrid(a, b)
+
+
+def test_esmf_generate_weights():
+    alats = 10
+    alons = 11
+
+    a = xarray.DataArray(
+        numpy.zeros((alats, alons)),
+        name='var',
+        dims=['lat', 'lon'],
+        coords={'lat': numpy.linspace(-90, 90, alats), 'lon': numpy.linspace(0, 360, alons, endpoint=False)})
+    a.lat.attrs['units'] = 'degrees_north'
+    a.lon.attrs['units'] = 'degrees_east'
+
+    a[1,3] = numpy.nan
+
+    blats = 12
+    blons = 13
+
+    b = xarray.DataArray(
+        numpy.zeros((blats, blons)),
+        name='var',
+        dims=['lat', 'lon'],
+        coords={'lat': numpy.linspace(-90, 90, blats), 'lon': numpy.linspace(-180, 180, blons, endpoint=False)})
+    b.lat.attrs['units'] = 'degrees_north'
+    b.lon.attrs['units'] = 'degrees_east'
+
+    b[6,4] = numpy.nan
+
+    w = esmf_generate_weights(a, b)
+
+    # Weights should have the correct size
+    numpy.testing.assert_array_equal(w.src_grid_dims, [alons, alats])
+    numpy.testing.assert_array_equal(w.dst_grid_dims, [blons, blats])
+
+    # Masks should pass through
+    numpy.testing.assert_array_equal(w.mask_a, a.notnull().data.ravel())
+    numpy.testing.assert_array_equal(w.mask_b, b.notnull().data.ravel())
+

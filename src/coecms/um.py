@@ -252,11 +252,12 @@ def sstice_erai(begindate, enddate, frequency, um_grid):
     # Grab the data at the correct times from ERA-Interim 
     data = erai('oper_an_sfc').sel(time=slice(begindate, enddate)).resample(time=frequency).asfreq()
 
-    # Regrid to the target UM resolution
+    # Setup the mask - ESMF doesn't like NAN
     data['tos'].encoding['_FillValue'] = -9999
-    w = esmf_generate_weights(data, um_grid, source_mask='tos')
+    w = esmf_generate_weights(data, um_grid, source_mask='tos', method='patch')
     r = Regridder(weights=w)
 
+    # Regrid to the target UM resolution
     ds_um = xarray.Dataset()
     ds_um['sic'] = r.regrid(data.sic)
     ds_um['tos'] = r.regrid(data.tos)
