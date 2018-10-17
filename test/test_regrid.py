@@ -20,6 +20,7 @@ import xarray
 import dask.array
 import numpy
 import numpy.testing
+import pytest
 
 
 def test_cdo_generate_weights(tmpdir):
@@ -31,7 +32,7 @@ def test_cdo_generate_weights(tmpdir):
     d[:, :] = center_lon
 
     grid = identify_grid(d)
-    weights = cdo_generate_weights(d, grid, 'bilinear')
+    weights = cdo_generate_weights(d, grid)
 
     assert 'remap_matrix' in weights
 
@@ -55,7 +56,7 @@ def compare_regrids(tmpdir, source, target):
 
     cdo = xarray.open_dataset(str(outfile))
 
-    cms = regrid(source, target, 'bilinear')
+    cms = regrid(source, target)
 
     numpy.testing.assert_array_equal(cdo['var'].data[...], cms.data[...])
 
@@ -69,7 +70,7 @@ def test_call_regrid(tmpdir):
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
 
-    r = regrid(a0, a0, 'bilinear')
+    r = regrid(a0, a0)
 
     assert r is not None
 
@@ -87,7 +88,7 @@ def test_manual_weights(tmpdir):
     a0.lon.attrs['units'] = 'degrees_east'
 
     grid = identify_grid(a0)
-    weights = cdo_generate_weights(a0, grid, 'bilinear')
+    weights = cdo_generate_weights(a0, grid)
 
     r = regrid(a0, weights=weights)
 
@@ -256,4 +257,52 @@ def test_esmf_generate_weights():
     # Masks should pass through
     numpy.testing.assert_array_equal(w.mask_a, a.notnull().data.ravel())
     numpy.testing.assert_array_equal(w.mask_b, b.notnull().data.ravel())
+
+
+@pytest.mark.parametrize("weight_gen,weight_args", [
+        (esmf_generate_weights,{}),
+        (cdo_generate_weights,{}),
+        (cdo_generate_weights,{'method': 'ycon'}),
+    ])
+def test_regrid_weight_gen(weight_gen,weight_args):
+    alats = 10
+    alons = 11
+
+    a = xarray.DataArray(
+        numpy.random.rand(alats, alons),
+        name='var',
+        dims=['lat', 'lon'],
+        coords={'lat': numpy.linspace(-90, 90, alats), 'lon': numpy.linspace(0, 360, alons, endpoint=False)})
+    a.lat.attrs['units'] = 'degrees_north'
+    a.lon.attrs['units'] = 'degrees_east'
+
+    a[1,3] = numpy.nan
+
+    blats = 12
+    blons = 13
+
+    b = xarray.DataArray(
+        numpy.random.rand(blats, blons),
+        name='var',
+        dims=['lat', 'lon'],
+        coords={'lat': numpy.linspace(-90, 90, blats), 'lon': numpy.linspace(-180, 180, blons, endpoint=False)})
+    b.lat.attrs['units'] = 'degrees_north'
+    b.lon.attrs['units'] = 'degrees_east'
+
+    b[6,4] = numpy.nan
+
+    w = weight_gen(a, b, **weight_args)
+    c = regrid(a, weights=w)
+
+    # Dimensions match the target grid
+    numpy.testing.assert_array_equal(c.shape, b.shape)
+    numpy.testing.assert_array_almost_equal(c.lat, b.lat)
+    numpy.testing.assert_array_almost_equal(numpy.mod(c.lon, 360), numpy.mod(b.lon, 360))
+
+    # We don't just have a grid of NAN
+    assert not numpy.isnan(c).all()
+
+    # Output is masked
+    assert numpy.isnan(b[6,4])
+
 

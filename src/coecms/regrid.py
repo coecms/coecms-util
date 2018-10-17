@@ -15,21 +15,26 @@
 # limitations under the License.
 from __future__ import print_function
 
-from .grid import *
 from .dimension import remove_degenerate_axes
+from .grid import *
 
-import subprocess
-import xarray
-import sparse
-import dask.array
-import tempfile
-import sys
-import math
 from datetime import datetime
 from shutil import which
+import dask.array
+import math
+import os
+import sparse
+import subprocess
+import sys
+import tempfile
+import xarray
 
 
-def cdo_generate_weights(source_grid, target_grid, method):
+def cdo_generate_weights(source_grid, target_grid,
+        method='bil',
+        extrapolate=True,
+        remap_norm='fracarea',
+        remap_area_min=0.0):
     """
     Generate weights for regridding using CDO
 
@@ -37,28 +42,48 @@ def cdo_generate_weights(source_grid, target_grid, method):
         source_grid (xarray.Dataset): Source grid
         target_grid (xarray.Dataset): Target grid
             description
-        method: Regridding method
+        method (str): Regridding method
+        extrapolate (bool): Extrapolate output field
+        remap_norm (str): Normalisation method for conservative methods
+        remap_area_min (float): Minimum destination area fraction
 
     Returns:
         xarray.Dataset: Regridding weights
     """
+
+    supported_methods = ['bic','bil','con','con2','dis','laf','nn','ycon']
+    if method not in supported_methods:
+        raise Exception
+    if remap_norm not in ['fracarea', 'destarea']:
+        raise Exception
 
     # Make some temporary files that we'll feed to CDO
     source_grid_file = tempfile.NamedTemporaryFile()
     target_grid_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
 
-    try:
-        source_grid.to_netcdf(source_grid_file.name)
-        target_grid.to_cdo_grid(target_grid_file)
+    source_grid.to_netcdf(source_grid_file.name)
+    target_grid.to_netcdf(target_grid_file.name)
 
+    # Setup environment
+    env = os.environ
+    if extrapolate:
+        env['REMAP_EXTRAPOLATE'] = 'on'
+    else:
+        env['REMAP_EXTRAPOLATE'] = 'off'
+    
+    env['CDO_REMAP_NORM'] = remap_norm
+    env['REMAP_AREA_MIN'] = '%f'%(remap_area_min)
+
+    try:
         # Run CDO
         subprocess.check_output([
             "cdo",
             "genbil,%s" % target_grid_file.name,
             source_grid_file.name,
             weight_file.name],
-            stderr=subprocess.PIPE)
+            stderr=subprocess.PIPE,
+            env=env)
 
         # Grab the weights file it outputs as a xarray.Dataset
         weights = xarray.open_dataset(weight_file.name)
@@ -176,6 +201,8 @@ def apply_weights(source_data, weights):
         dst_grid_center_lat = w.yc_b.data.reshape(dst_grid_shape[::-1], order='C')
         dst_grid_center_lon = w.xc_b.data.reshape(dst_grid_shape[::-1], order='C')
 
+        axis_scale = 1 # Weight lat/lon in degrees
+
     else:
         src_address = w.src_address - 1
         dst_address = w.dst_address - 1
@@ -185,6 +212,8 @@ def apply_weights(source_data, weights):
         dst_grid_shape = w.dst_grid_dims.data
         dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(dst_grid_shape[::-1], order='C')
         dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(dst_grid_shape[::-1], order='C')
+
+        axis_scale = 180.0 / math.pi # Weight lat/lon in radians
 
     # Use sparse instead of scipy as it behaves better with Dask
     weight_matrix = sparse.COO([src_address.data, dst_address.data],
@@ -230,9 +259,9 @@ def apply_weights(source_data, weights):
     unstacked_out.coords['lat'] = remove_degenerate_axes(unstacked_out.lat)
     unstacked_out.coords['lon'] = remove_degenerate_axes(unstacked_out.lon)
 
-    # Convert from radians to degrees
-    unstacked_out.coords['lat'] = unstacked_out.lat# / math.pi * 180.0
-    unstacked_out.coords['lon'] = unstacked_out.lon# / math.pi * 180.0
+    # Convert to degrees if needed
+    unstacked_out.coords['lat'] = unstacked_out.lat * axis_scale
+    unstacked_out.coords['lon'] = unstacked_out.lon * axis_scale
 
     # Add metadata to the coordinates
     unstacked_out.coords['lat'].attrs['units'] = 'degrees_north'
@@ -257,7 +286,7 @@ class Regridder(object):
         method: Regridding method
     """
 
-    def __init__(self, source_grid=None, target_grid=None, method='bilinear', weights=None):
+    def __init__(self, source_grid=None, target_grid=None, weights=None):
 
         if (source_grid is None or target_grid is None) and weights is None:
             raise Exception("Either weights or source_grid/target_grid must be supplied")
@@ -269,7 +298,7 @@ class Regridder(object):
             # Generate the weights with CDO
             _source_grid = identify_grid(source_grid)
             _target_grid = identify_grid(target_grid)
-            self.weights = cdo_generate_weights(_source_grid, _target_grid, method)
+            self.weights = cdo_generate_weights(_source_grid, _target_grid)
 
     def regrid(self, source_data):
         """
@@ -286,7 +315,7 @@ class Regridder(object):
         return apply_weights(source_data, self.weights)
 
 
-def regrid(source_data, target_grid=None, method='bilinear', weights=None):
+def regrid(source_data, target_grid=None, weights=None):
     """
     A simple regrid. Inefficient if you are regridding more than one dataset
     to the target grid because it re-generates the weights each time you call
@@ -303,6 +332,6 @@ def regrid(source_data, target_grid=None, method='bilinear', weights=None):
         xarray.Datset: Regridded version of the source dataset
     """
 
-    regridder = Regridder(source_data, target_grid=target_grid, weights=weights, method=method)
+    regridder = Regridder(source_data, target_grid=target_grid, weights=weights)
 
     return regridder.regrid(source_data)
