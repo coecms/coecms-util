@@ -79,7 +79,7 @@ def cdo_generate_weights(source_grid, target_grid,
         # Run CDO
         subprocess.check_output([
             "cdo",
-            "genbil,%s" % target_grid_file.name,
+            "gen%s,%s" % (method, target_grid_file.name),
             source_grid_file.name,
             weight_file.name],
             stderr=subprocess.PIPE,
