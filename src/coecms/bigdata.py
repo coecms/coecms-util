@@ -20,6 +20,8 @@ limitations under the License.
 
 import dask
 import netCDF4
+import xarray
+
 
 def unsafe_mfdataset(path_series, dim='time'):
     """Virtually concatenate files, without checking dimensions
@@ -46,7 +48,7 @@ def unsafe_mfdataset(path_series, dim='time'):
         index of ``path_series``
     """
     # Group the series by the path value, so we have groups of (path, [time_axis])
-    groups = path_series.groupby(series).groups
+    groups = path_series.groupby(path_series).groups
     
     paths = list(groups.keys())
     path_dates = list(groups.values())
@@ -57,7 +59,7 @@ def unsafe_mfdataset(path_series, dim='time'):
     # Work out which variables contain ``dim`` and which do not
     aggregate_vars = []
     static_vars = []
-    for k, v in ds0.variables.items():
+    for k, v in mold_ds.variables.items():
         if dim in v.dims:
             aggregate_vars.append(k)
         else:
@@ -88,8 +90,6 @@ def unsafe_mfdataset(path_series, dim='time'):
         # Add the now concatenated DataArray to the output dataset
         ds[v] = da
         
-    return ds
-
     # Copy the non-collated variables from the first file
     for v in static_vars:
         ds[v] = mold_ds[v]
