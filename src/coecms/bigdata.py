@@ -49,13 +49,13 @@ def unsafe_mfdataset(path_series, dim='time'):
     """
     # Group the series by the path value, so we have groups of (path, [time_axis])
     groups = path_series.groupby(path_series).groups
-    
+
     paths = list(groups.keys())
     path_dates = list(groups.values())
-    
+
     # Open just the first path, to get the metadata
     mold_ds = xarray.open_dataset(paths[0])
-    
+
     # Work out which variables contain ``dim`` and which do not
     aggregate_vars = []
     static_vars = []
@@ -64,13 +64,14 @@ def unsafe_mfdataset(path_series, dim='time'):
             aggregate_vars.append(k)
         else:
             static_vars.append(k)
-        
+
     # Get the dask arrays for each file
     # delayed_data is a list of dicts, each dict having the variables of a single file
     delayed_data = []
     for path, dates in groups.items():
-        delayed_data.append(virtual_dataset(path, aggregate_vars, mold_ds, dim, dates))
-        
+        delayed_data.append(virtual_dataset(
+            path, aggregate_vars, mold_ds, dim, dates))
+
     # Construct the new dataset
     ds = xarray.Dataset()
     ds.attrs = mold_ds.attrs
@@ -79,21 +80,22 @@ def unsafe_mfdataset(path_series, dim='time'):
     for v in aggregate_vars:
         # Aggregate Dask arrays
         concat_axis = mold_ds[v].dims.index(dim)
-        data = dask.array.concatenate([d[v] for d in delayed_data], axis=concat_axis)
-        
+        data = dask.array.concatenate(
+            [d[v] for d in delayed_data], axis=concat_axis)
+
         # Copy metadata from the mold dataset
         da = xarray.DataArray(data,
-                             dims=mold_ds[v].dims,
-                             attrs=mold_ds[v].attrs,
-                             name=mold_ds[v].name)
+                              dims=mold_ds[v].dims,
+                              attrs=mold_ds[v].attrs,
+                              name=mold_ds[v].name)
 
         # Add the now concatenated DataArray to the output dataset
         ds[v] = da
-        
+
     # Copy the non-collated variables from the first file
     for v in static_vars:
         ds[v] = mold_ds[v]
-        
+
     return ds
 
 
@@ -109,7 +111,7 @@ def delayed_open(path):
 
 def virtual_dataset(path, aggregate_vars, mold_ds, dim, dim_values):
     """Prepare Dask arrays for each variables in the file, without opening it
-    
+
     Only opens the file when the variables needs to be read
 
     Args:
@@ -124,18 +126,18 @@ def virtual_dataset(path, aggregate_vars, mold_ds, dim, dim_values):
     """
     # Delayed opening of the file
     ds = delayed_open(path)
-    
+
     data = {}
-    
+
     for v in aggregate_vars:
-        if v == dim: # No need for a Dask array
+        if v == dim:  # No need for a Dask array
             data[v] = dim_values
             continue
-        
+
         # Get the variable attributes from the mold Dataset
         dtype = mold_ds[v].dtype
         shape = list(mold_ds[v].shape)
-        
+
         # Overwrite the size on the concat dimension
         try:
             concat_axis = mold_ds[v].dims.index(dim)
@@ -143,8 +145,8 @@ def virtual_dataset(path, aggregate_vars, mold_ds, dim, dim_values):
             # NetCDF4 instead of xarray
             concat_axis = mold_ds[v].dimensions.index(dim)
         shape[concat_axis] = dim_values.size
-        
+
         # Construct a Dask array for the variable
         data[v] = dask.array.from_delayed(ds[v], shape=shape, dtype=dtype)
-            
+
     return data
