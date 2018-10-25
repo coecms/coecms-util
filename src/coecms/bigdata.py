@@ -50,8 +50,15 @@ def unsafe_mfdataset(paths, concat_dim='time', chunks={}, decode_cf=True,
     """
 
     fs = []
-    for p in paths:
-        fs.append(xarray.open_dataset(p, chunks=chunks, decode_cf=False, **kwargs))
+    fs.append(xarray.open_dataset(paths[0], chunks=chunks, decode_cf=False, **kwargs))
+
+    drop_variables = []
+    for k,v in fs[0].variables.items():
+        if concat_dim not in v.dims:
+            drop_variables.append(k)
+
+    for p in paths[1:]:
+        fs.append(xarray.open_dataset(p, chunks=chunks, decode_cf=False, drop_variables=drop_variables, **kwargs))
 
     ds = xarray.Dataset(attrs=fs[0].attrs)
 
