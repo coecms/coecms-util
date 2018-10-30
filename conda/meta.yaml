@@ -23,6 +23,7 @@ requirements:
         - scipy
         - sparse
         - xarray
+        - hdf5=1.10.1 # Missing dependency of CDO
 
 test:
     requires:
