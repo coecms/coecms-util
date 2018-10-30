@@ -43,9 +43,22 @@ def cdo_generate_weights(source_grid, target_grid,
     """
     Generate weights for regridding using CDO
 
+    Available weight generation methods are:
+
+     * bic: SCRIP Bicubic
+     * bil: SCRIP Bilinear
+     * con: SCRIP First-order conservative
+     * con2: SCRIP Second-order conservative
+     * dis: SCRIP Distance-weighted average
+     * laf: YAC Largest area fraction
+     * ycon: YAC First-order conservative
+     * nn: Nearest neighbour
+
+    Run ``cdo gen${method} --help`` for details of each method
+
     Args:
-        source_grid (xarray.Dataset): Source grid
-        target_grid (xarray.Dataset): Target grid
+        source_grid (xarray.DataArray): Source grid
+        target_grid (xarray.DataArray): Target grid
             description
         method (str): Regridding method
         extrapolate (bool): Extrapolate output field
@@ -53,7 +66,7 @@ def cdo_generate_weights(source_grid, target_grid,
         remap_area_min (float): Minimum destination area fraction
 
     Returns:
-        xarray.Dataset: Regridding weights
+        :obj:`xarray.Dataset` with regridding weights
     """
 
     supported_methods = ['bic', 'bil', 'con',
@@ -116,12 +129,12 @@ def esmf_generate_weights(
 ):
     """Generate regridding weights with ESMF
 
-    https://www.earthsystemcog.org/projects/esmf/regridding
+    For details see https://www.earthsystemcog.org/projects/esmf/regridding
 
     Args:
-        source_grid (:obj:`xarray.Dataarray`): Source grid. If masked the mask
+        source_grid (:obj:`xarray.DataArray`): Source grid. If masked the mask
             will be used in the regridding
-        target_grid (:obj:`xarray.Dataarray`): Target grid. If masked the mask
+        target_grid (:obj:`xarray.DataArray`): Target grid. If masked the mask
             will be used in the regridding
         method (str): ESMF Regridding method, see ``ESMF_RegridWeightGen --help``
         extrap_method (str): ESMF Extrapolation method, see ``ESMF_RegridWeightGen --help``
@@ -135,14 +148,14 @@ def esmf_generate_weights(
     target_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
 
+    # If ESMF_rwg is not on $PATH, use the version in Raijin's /apps
     rwg = 'ESMF_RegridWeightGen'
-
     if which(rwg) is None:
         rwg = '/apps/esmf/7.1.0r-intel/bin/binO/Linux.intel.64.openmpi.default/ESMF_RegridWeightGen'
 
+    # Set _FillValue to something other than NAN
     if '_FillValue' not in source_grid.encoding:
         source_grid.encoding['_FillValue'] = -999999
-
     if '_FillValue' not in target_grid.encoding:
         target_grid.encoding['_FillValue'] = -999999
 
@@ -150,6 +163,7 @@ def esmf_generate_weights(
         source_grid.to_netcdf(source_file.name)
         target_grid.to_netcdf(target_file.name)
 
+        # Run ESMF_rwg
         command = [rwg,
                    '--source', source_file.name,
                    '--destination', target_file.name,
@@ -166,6 +180,7 @@ def esmf_generate_weights(
                                       stderr=subprocess.PIPE)
         print(out.decode('utf-8'))
 
+        # Grab the weights
         weights = xarray.open_dataset(weight_file.name)
         return weights
 
@@ -199,6 +214,7 @@ def apply_weights(source_data, weights):
     # array
 
     if w.title.startswith('ESMF'):
+        # ESMF style weights
         src_address = w.col - 1
         dst_address = w.row - 1
         remap_matrix = w.S
@@ -213,6 +229,7 @@ def apply_weights(source_data, weights):
         axis_scale = 1  # Weight lat/lon in degrees
 
     else:
+        # CDO style weights
         src_address = w.src_address - 1
         dst_address = w.dst_address - 1
         remap_matrix = w.remap_matrix[:, 0]
@@ -287,17 +304,21 @@ def apply_weights(source_data, weights):
 
 
 class Regridder(object):
-    """
-    Set up the regridding operation
+    """Set up the regridding operation
 
-    For large grids you may wish to pre-calculate the weights using ESMF_RegridWeightGen, if not supplied weights will
-    be calculated using CDO.
+    Supply either both ``source_grid`` and ``dest_grid`` or just ``weights``.
+
+    For large grids you may wish to pre-calculate the weights using
+    ESMF_RegridWeightGen, if not supplied ``weights`` will be calculated from
+    ``source_grid`` and ``dest_grid`` using CDO's genbil function.
+
+    Weights may be pre-computed by an external program, or created using
+    :func:`cdo_generate_weights` or :func:`esmf_generate_weights`
 
     Args:
-        source_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Source grid / sample dataset
-        target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
-        weights (xarray.Dataset): Pre-computed interpolation weights
-        method: Regridding method
+        source_grid (:class:`coecms.grid.Grid` or :class:`xarray.DataArray`): Source grid / sample dataset
+        target_grid (:class:`coecms.grid.Grid` or :class:`xarray.DataArray`): Target grid / sample dataset
+        weights (:class:`xarray.Dataset`): Pre-computed interpolation weights
     """
 
     def __init__(self, source_grid=None, target_grid=None, weights=None):
@@ -316,15 +337,13 @@ class Regridder(object):
             self.weights = cdo_generate_weights(_source_grid, _target_grid)
 
     def regrid(self, source_data):
-        """
-        Regrid the xarray.Dataset ``source_data`` to match the target grid,
-        using the weights stored in the regridder
+        """Regrid ``source_data`` to match the target grid
 
         Args:
-            source_data (xarray.Dataset): Source dataset
+            source_data (:class:`xarray.DataArray`): Source variable
 
         Returns:
-            xarray.Datset: Regridded version of the source dataset
+            :class:`xarray.DataArray` with a regridded version of the source variable
         """
 
         return apply_weights(source_data, self.weights)
@@ -339,12 +358,11 @@ def regrid(source_data, target_grid=None, weights=None):
     To save the weights use :class:`Regridder`.
 
     Args:
-        source_data (xarray.Dataset): Source dataset
-        target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
-        method: Regridding method
+        source_data (:class:`xarray.DataArray`): Source variable
+        target_grid (:class:`coecms.grid.Grid` or :class:`xarray.DataArray`): Target grid / sample variable
 
     Returns:
-        xarray.Datset: Regridded version of the source dataset
+        :class:`xarray.DataArray` with a regridded version of the source variable
     """
 
     regridder = Regridder(
