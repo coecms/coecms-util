@@ -27,6 +27,7 @@ requirements:
 test:
     requires:
         - pytest
+        - esmf
     source_files:
         - setup.cfg
         - test

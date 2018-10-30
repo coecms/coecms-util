@@ -220,6 +220,7 @@ def apply_weights(source_data, weights):
                                remap_matrix.data,
                                shape=w_shape,
                                )
+    weight_matrix = dask.array.from_array(weight_matrix, chunks=(100,100))
 
     # Grab the target grid lats and lons - these are 1d arrays that we need to
     # reshape to the correct size
