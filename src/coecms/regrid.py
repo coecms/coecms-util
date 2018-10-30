@@ -19,7 +19,6 @@ from .dimension import remove_degenerate_axes
 from .grid import *
 
 from datetime import datetime
-from shutil import which
 import dask.array
 import math
 import os
@@ -29,6 +28,11 @@ import sys
 import tempfile
 import xarray
 
+# Python 2 compat
+try:
+    from shutil import which
+except ImportError:
+    from whichcraft import which
 
 def cdo_generate_weights(source_grid, target_grid,
         method='bil',
