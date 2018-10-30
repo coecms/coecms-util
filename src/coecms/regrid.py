@@ -95,7 +95,8 @@ def cdo_generate_weights(source_grid, target_grid,
 
     except subprocess.CalledProcessError as e:
         # Print the CDO error message
-        print(e.stderr.decode(), file=sys.stderr)
+        #print(e.stderr.decode(), file=sys.stderr)
+        print(e.output.decode(), file=sys.stderr)
         raise
 
     finally:

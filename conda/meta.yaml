@@ -24,7 +24,7 @@ requirements:
         - sparse
         - xarray
         - hdf5=1.10.1 # Missing dependency of CDO
-        - whichcraft #[py2]
+        - whichcraft
 
 test:
     requires:
