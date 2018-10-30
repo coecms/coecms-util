@@ -20,7 +20,7 @@ setup(
             'scipy',
             'sparse',
             'xarray',
-            'whichcraft;python_version<3'
+            'whichcraft;python_version<"3.3"'
             ],
         entry_points = {
             'console_scripts': [
