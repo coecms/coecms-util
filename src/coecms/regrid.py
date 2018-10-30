@@ -34,11 +34,12 @@ try:
 except ImportError:
     from whichcraft import which
 
+
 def cdo_generate_weights(source_grid, target_grid,
-        method='bil',
-        extrapolate=True,
-        remap_norm='fracarea',
-        remap_area_min=0.0):
+                         method='bil',
+                         extrapolate=True,
+                         remap_norm='fracarea',
+                         remap_area_min=0.0):
     """
     Generate weights for regridding using CDO
 
@@ -55,7 +56,8 @@ def cdo_generate_weights(source_grid, target_grid,
         xarray.Dataset: Regridding weights
     """
 
-    supported_methods = ['bic','bil','con','con2','dis','laf','nn','ycon']
+    supported_methods = ['bic', 'bil', 'con',
+                         'con2', 'dis', 'laf', 'nn', 'ycon']
     if method not in supported_methods:
         raise Exception
     if remap_norm not in ['fracarea', 'destarea']:
@@ -75,9 +77,9 @@ def cdo_generate_weights(source_grid, target_grid,
         env['REMAP_EXTRAPOLATE'] = 'on'
     else:
         env['REMAP_EXTRAPOLATE'] = 'off'
-    
+
     env['CDO_REMAP_NORM'] = remap_norm
-    env['REMAP_AREA_MIN'] = '%f'%(remap_area_min)
+    env['REMAP_AREA_MIN'] = '%f' % (remap_area_min)
 
     try:
         # Run CDO
@@ -111,7 +113,7 @@ def esmf_generate_weights(
         target_grid,
         method='bilinear',
         extrap_method='nearestidavg',
-        ):
+):
     """Generate regridding weights with ESMF
 
     https://www.earthsystemcog.org/projects/esmf/regridding
@@ -149,19 +151,19 @@ def esmf_generate_weights(
         target_grid.to_netcdf(target_file.name)
 
         command = [rwg,
-            '--source', source_file.name,
-            '--destination', target_file.name,
-            '--weight', weight_file.name,
-            '--method', method,
-            '--extrap_method', extrap_method,
-            '--ignore_unmapped',
-            '--src_missingvalue', source_grid.name,
-            '--dst_missingvalue', target_grid.name,
-            '--no-log',
-            ]
+                   '--source', source_file.name,
+                   '--destination', target_file.name,
+                   '--weight', weight_file.name,
+                   '--method', method,
+                   '--extrap_method', extrap_method,
+                   '--ignore_unmapped',
+                   '--src_missingvalue', source_grid.name,
+                   '--dst_missingvalue', target_grid.name,
+                   '--no-log',
+                   ]
 
         out = subprocess.check_output(args=command,
-            stderr=subprocess.PIPE)
+                                      stderr=subprocess.PIPE)
         print(out.decode('utf-8'))
 
         weights = xarray.open_dataset(weight_file.name)
@@ -203,29 +205,33 @@ def apply_weights(source_data, weights):
         w_shape = (w.sizes['n_a'], w.sizes['n_b'])
 
         dst_grid_shape = w.dst_grid_dims.data
-        dst_grid_center_lat = w.yc_b.data.reshape(dst_grid_shape[::-1], order='C')
-        dst_grid_center_lon = w.xc_b.data.reshape(dst_grid_shape[::-1], order='C')
+        dst_grid_center_lat = w.yc_b.data.reshape(
+            dst_grid_shape[::-1], order='C')
+        dst_grid_center_lon = w.xc_b.data.reshape(
+            dst_grid_shape[::-1], order='C')
 
-        axis_scale = 1 # Weight lat/lon in degrees
+        axis_scale = 1  # Weight lat/lon in degrees
 
     else:
         src_address = w.src_address - 1
         dst_address = w.dst_address - 1
-        remap_matrix = w.remap_matrix[:,0]
-        w_shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
+        remap_matrix = w.remap_matrix[:, 0]
+        w_shape = (w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
 
         dst_grid_shape = w.dst_grid_dims.data
-        dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(dst_grid_shape[::-1], order='C')
-        dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(dst_grid_shape[::-1], order='C')
+        dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(
+            dst_grid_shape[::-1], order='C')
+        dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(
+            dst_grid_shape[::-1], order='C')
 
-        axis_scale = 180.0 / math.pi # Weight lat/lon in radians
+        axis_scale = 180.0 / math.pi  # Weight lat/lon in radians
 
     # Use sparse instead of scipy as it behaves better with Dask
     weight_matrix = sparse.COO([src_address.data, dst_address.data],
                                remap_matrix.data,
                                shape=w_shape,
                                )
-    weight_matrix = dask.array.from_array(weight_matrix, chunks=(100,100))
+    weight_matrix = dask.array.from_array(weight_matrix, chunks=(100, 100))
 
     # Grab the target grid lats and lons - these are 1d arrays that we need to
     # reshape to the correct size
@@ -241,14 +247,16 @@ def apply_weights(source_data, weights):
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
     data = dask.array.matmul(stacked_source_masked, weight_matrix)
-    mask = dask.array.matmul(dask.array.ma.getmaskarray(stacked_source_masked), weight_matrix)
+    mask = dask.array.matmul(dask.array.ma.getmaskarray(
+        stacked_source_masked), weight_matrix)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
     # this stage the horizontal grid is still stacked into one dimension
     out = xarray.DataArray(dask.array.ma.masked_array(data, mask=(mask != 0)),
                            dims=stacked_source.dims,
-                           coords={k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
+                           coords={
+                               k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
                            name=source_data.name,
                            attrs=source_data.attrs)
 
@@ -295,7 +303,8 @@ class Regridder(object):
     def __init__(self, source_grid=None, target_grid=None, weights=None):
 
         if (source_grid is None or target_grid is None) and weights is None:
-            raise Exception("Either weights or source_grid/target_grid must be supplied")
+            raise Exception(
+                "Either weights or source_grid/target_grid must be supplied")
 
         # Is there already a weights file?
         if weights is not None:
@@ -338,6 +347,7 @@ def regrid(source_data, target_grid=None, weights=None):
         xarray.Datset: Regridded version of the source dataset
     """
 
-    regridder = Regridder(source_data, target_grid=target_grid, weights=weights)
+    regridder = Regridder(
+        source_data, target_grid=target_grid, weights=weights)
 
     return regridder.regrid(source_data)
