@@ -14,7 +14,7 @@ requirements:
         - python
     run:
         - python
-        - cdo
+        - cdo=1.9.4
         - cfunits
         - dask
         - mule
@@ -23,8 +23,8 @@ requirements:
         - scipy
         - sparse
         - xarray
+        - whichcraft # [py2k]
         - hdf5=1.10.1 # Missing dependency of CDO
-        - whichcraft
 
 test:
     requires:
