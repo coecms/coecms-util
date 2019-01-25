@@ -23,6 +23,7 @@ requirements:
         - scipy
         - sparse
         - xarray
+        - f90nml
 
 test:
     requires:

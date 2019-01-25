@@ -23,5 +23,6 @@ setup(
             ],
         entry_points = {
             'console_scripts': [
+                'diffnml = coecms.diffnml:main'
                 ]}
         )
