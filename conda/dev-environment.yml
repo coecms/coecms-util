@@ -13,3 +13,4 @@ dependencies:
     - mule
     - cfunits
     - dask
+    - f90nml
