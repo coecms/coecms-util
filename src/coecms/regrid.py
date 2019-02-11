@@ -106,6 +106,8 @@ def esmf_generate_weights(
         target_grid,
         method='bilinear',
         extrap_method='nearestidavg',
+        norm_type='dstarea',
+        ignore_unmapped=False,
         ):
     """Generate regridding weights with ESMF
 
@@ -124,9 +126,12 @@ def esmf_generate_weights(
             ESMF_RegridWeightGen
     """
     # Make some temporary files that we'll feed to ESMF
-    source_file = tempfile.NamedTemporaryFile()
-    target_file = tempfile.NamedTemporaryFile()
+    #source_file = tempfile.NamedTemporaryFile()
+    #target_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
+
+    source_file = open('sscrip.nc','wb')
+    target_file = open('tscrip.nc','wb')
 
     rwg = 'ESMF_RegridWeightGen'
 
@@ -149,11 +154,22 @@ def esmf_generate_weights(
             '--weight', weight_file.name,
             '--method', method,
             '--extrap_method', extrap_method,
-            '--ignore_unmapped',
-            '--src_missingvalue', source_grid.name,
-            '--dst_missingvalue', target_grid.name,
+            '--norm_type', norm_type,
             '--no-log',
             ]
+
+        if isinstance(source_grid, xarray.DataArray):
+            command.extend([
+                '--src_missingvalue', source_grid.name,
+                ])
+        if isinstance(target_grid, xarray.DataArray):
+            command.extend([
+                '--dst_missingvalue', target_grid.name,
+                ])
+        if ignore_unmapped:
+            command.extend([
+                '--ignore_unmapped',
+                ])
 
         out = subprocess.check_output(args=command,
             stderr=subprocess.PIPE)
@@ -161,6 +177,10 @@ def esmf_generate_weights(
 
         weights = xarray.open_dataset(weight_file.name)
         return weights
+
+    except subprocess.CalledProcessError as e:
+        print(e.output.decode('utf-8'))
+        raise
 
     finally:
         # Clean up the temporary files
