@@ -16,6 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Clean up a UM astart file, removing invalid values (e.g. negative temperatures)
+"""
+
 import argparse
 import mule
 import numpy
@@ -33,6 +37,7 @@ class CleanAstartOperator(mule.DataOperator):
         data = source.get_data()
 
         if source.lbuser4 == 241:
+            # Snow capacity must be >= 0
             data = numpy.where(data > 0, data, 0)
 
         return data
@@ -53,9 +58,9 @@ def clean_astart(input_path, output_path):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input')
-    parser.add_argument('--output', '-o')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('input', help='Input filename')
+    parser.add_argument('--output', '-o', help='Output filename', required=True)
     args = parser.parse_args()
 
     clean_astart(args.input, args.output)
