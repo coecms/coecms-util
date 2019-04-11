@@ -16,6 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Remove masked values from an ancil file using nearest grid point interpolation
+"""
+
 import mule
 import numpy
 import xarray
@@ -82,9 +86,9 @@ def demask(input_path, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input')
-    parser.add_argument('--output', '-o')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('input', help='Input filename')
+    parser.add_argument('--output', '-o', help='Output filename', required=True)
     args = parser.parse_args()
 
     demask(args.input, args.output)
