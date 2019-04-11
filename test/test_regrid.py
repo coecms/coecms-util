@@ -117,6 +117,7 @@ def test_compare_regrids(tmpdir):
     compare_regrids(tmpdir.mkdir('a1a1'), a1, a1)
 
 
+@pytest.mark.xfail(reason="sparse doesn't yet support Dask arrays")
 def test_dask_regrid(tmpdir):
     d = dask.array.zeros((2, 2), chunks=(2, 2))
 

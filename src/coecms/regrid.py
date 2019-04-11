@@ -267,17 +267,15 @@ def apply_weights(source_data, weights):
     # Reshape the source dataset, so that the last dimension is a 1d array over
     # the lats and lons that we can multiply against the weights array
     stacked_source = source_data.stack(latlon=('lat', 'lon'))
-    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source).compute()
-    numpy.ma.set_fill_value(stacked_source_masked, 0)
+    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
+    dask.array.ma.set_fill_value(stacked_source_masked, 0)
 
     # With the horizontal grid as a 1d array in the last dimension,
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
 
-    data = sparse.matmul(stacked_source_masked, weight_matrix)
-    #data = numpy.matmul(stacked_source_masked.compute(), weight_matrix)
-    #data = dask.array.matmul(stacked_source_masked, weight_matrix).compute()
-    #mask = sparse.matmul(dask.array.ma.getmaskarray(stacked_source_masked).compute(), weight_matrix)
+    data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
+    #data = dask.array.matmul(stacked_source_masked, weight_matrix)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
