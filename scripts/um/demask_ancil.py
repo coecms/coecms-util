@@ -33,13 +33,14 @@ class RegridOperator(mule.DataOperator):
         return source.copy()
 
     def transform(self, source, dest):
-        data = xarray.DataArray(source.get_data().astype('f4'), dims=['lat','lon'])
+        data = xarray.DataArray(
+            source.get_data().astype('f4'), dims=['lat', 'lon'])
 
         newdata = regrid(data, weights=self.weights).values
 
         if source.lbuser4 in [217]:
             # Floor of 0
-            newdata = numpy.where(newdata>0, newdata, 0)
+            newdata = numpy.where(newdata > 0, newdata, 0)
 
         return newdata
 
@@ -55,22 +56,22 @@ def demask(input_path, output_path):
     mask = numpy.where(field0.get_data() == -1073741824, 0, 1)
 
     lats = xarray.DataArray(
-            field0.bzy + (1 + numpy.array(range(mask.shape[0]))) * field0.bdy,
-            dims='lat')
+        field0.bzy + (1 + numpy.array(range(mask.shape[0]))) * field0.bdy,
+        dims='lat')
     lons = xarray.DataArray(
-            field0.bzx + (1 + numpy.array(range(mask.shape[1]))) * field0.bdx,
-            dims='lon')
+        field0.bzx + (1 + numpy.array(range(mask.shape[1]))) * field0.bdx,
+        dims='lon')
 
     src_grid = LonLatGrid(lats=lats, lons=lons, mask=mask).to_scrip()
     tgt_grid = LonLatGrid(lats=lats, lons=lons).to_scrip()
 
     weights = esmf_generate_weights(src_grid, tgt_grid, method='neareststod',
-            line_type='greatcircle', extrap_method='neareststod')
+                                    line_type='greatcircle', extrap_method='neareststod')
 
     op = RegridOperator(weights=weights)
 
     anc_out = anc.copy()
-    
+
     def no_validate(*args, **kwargs):
         pass
     anc_out.validate = no_validate
@@ -78,12 +79,12 @@ def demask(input_path, output_path):
     for f in anc.fields:
         anc_out.fields.append(op(f))
     anc_out.to_file(output_path)
-    
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input')
-    parser.add_argument('--output','-o')
+    parser.add_argument('--output', '-o')
     args = parser.parse_args()
 
     demask(args.input, args.output)

@@ -22,10 +22,12 @@ import matplotlib.pyplot as plt
 import argparse
 import numpy
 
+
 def check_mask(oasis, um):
     oasis_mask = xarray.open_dataset(oasis)['um_t.msk']
 
-    um_mask = numpy.where(mule.AncilFile.from_file(um).fields[0].get_data() < 1, 1, 0)
+    um_mask = numpy.where(mule.AncilFile.from_file(
+        um).fields[0].get_data() < 1, 1, 0)
 
     plt.pcolormesh(1 - oasis_mask - um_mask)
     plt.colorbar()

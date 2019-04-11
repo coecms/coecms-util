@@ -51,10 +51,11 @@ def clean_astart(input_path, output_path):
         astart_out.fields.append(op(f))
     astart_out.to_file(output_path)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('input')
-    parser.add_argument('--output','-o')
+    parser.add_argument('--output', '-o')
     args = parser.parse_args()
 
     clean_astart(args.input, args.output)
