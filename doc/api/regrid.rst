@@ -18,3 +18,7 @@ can call :func:`coecms.regrid.regrid` to quickly regrid a single dataset.
     :members:
 
 .. autofunction:: coecms.regrid.regrid
+
+.. autofunction:: coecms.regrid.cdo_generate_weights
+
+.. autofunction:: coecms.regrid.esmf_generate_weights

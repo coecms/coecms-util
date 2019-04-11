@@ -38,9 +38,22 @@ def cdo_generate_weights(source_grid, target_grid,
     """
     Generate weights for regridding using CDO
 
+    Available weight generation methods are:
+
+     * bic: SCRIP Bicubic
+     * bil: SCRIP Bilinear
+     * con: SCRIP First-order conservative
+     * con2: SCRIP Second-order conservative
+     * dis: SCRIP Distance-weighted average
+     * laf: YAC Largest area fraction
+     * ycon: YAC First-order conservative
+     * nn: Nearest neighbour
+
+    Run ``cdo gen${method} --help`` for details of each method
+
     Args:
-        source_grid (xarray.Dataset): Source grid
-        target_grid (xarray.Dataset): Target grid
+        source_grid (xarray.DataArray): Source grid
+        target_grid (xarray.DataArray): Target grid
             description
         method (str): Regridding method
         extrapolate (bool): Extrapolate output field
@@ -48,7 +61,7 @@ def cdo_generate_weights(source_grid, target_grid,
         remap_area_min (float): Minimum destination area fraction
 
     Returns:
-        xarray.Dataset: Regridding weights
+        :obj:`xarray.Dataset` with regridding weights
     """
 
     supported_methods = ['bic','bil','con','con2','dis','laf','nn','ycon']
@@ -71,9 +84,9 @@ def cdo_generate_weights(source_grid, target_grid,
         env['REMAP_EXTRAPOLATE'] = 'on'
     else:
         env['REMAP_EXTRAPOLATE'] = 'off'
-    
+
     env['CDO_REMAP_NORM'] = remap_norm
-    env['REMAP_AREA_MIN'] = '%f'%(remap_area_min)
+    env['REMAP_AREA_MIN'] = '%f' % (remap_area_min)
 
     try:
         # Run CDO
@@ -91,7 +104,8 @@ def cdo_generate_weights(source_grid, target_grid,
 
     except subprocess.CalledProcessError as e:
         # Print the CDO error message
-        print(e.stderr.decode(), file=sys.stderr)
+        #print(e.stderr.decode(), file=sys.stderr)
+        print(e.output.decode(), file=sys.stderr)
         raise
 
     finally:
@@ -224,40 +238,41 @@ def apply_weights(source_data, weights):
     # array
 
     if w.title.startswith('ESMF'):
+        # ESMF style weights
         src_address = w.col - 1
         dst_address = w.row - 1
         remap_matrix = w.S
         w_shape = (w.sizes['n_a'], w.sizes['n_b'])
-        s_shape = w.n_a
 
         dst_grid_shape = w.dst_grid_dims.data
-        dst_grid_center_lat = w.yc_b.data.reshape(dst_grid_shape[::-1], order='C')
-        dst_grid_center_lon = w.xc_b.data.reshape(dst_grid_shape[::-1], order='C')
+        dst_grid_center_lat = w.yc_b.data.reshape(
+            dst_grid_shape[::-1], order='C')
+        dst_grid_center_lon = w.xc_b.data.reshape(
+            dst_grid_shape[::-1], order='C')
 
-        axis_scale = 1 # Weight lat/lon in degrees
+        axis_scale = 1  # Weight lat/lon in degrees
 
     else:
+        # CDO style weights
         src_address = w.src_address - 1
         dst_address = w.dst_address - 1
-        remap_matrix = w.remap_matrix[:,0]
-        w_shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
-        s_shape = w.src_grid_size
+        remap_matrix = w.remap_matrix[:, 0]
+        w_shape = (w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
 
         dst_grid_shape = w.dst_grid_dims.data
-        dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(dst_grid_shape[::-1], order='C')
-        dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(dst_grid_shape[::-1], order='C')
+        dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(
+            dst_grid_shape[::-1], order='C')
+        dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(
+            dst_grid_shape[::-1], order='C')
 
-        axis_scale = 180.0 / math.pi # Weight lat/lon in radians
-
-    if source_data.sizes['lat'] != s_shape[0] or source_data.sizes['lon'] == s_shape[1]:
-        Exception(f"Bad regrid: Input dims {source_data.sizes}, expected "
-                "('lat', 'lon') to be {s_shape}")
+        axis_scale = 180.0 / math.pi  # Weight lat/lon in radians
 
     # Use sparse instead of scipy as it behaves better with Dask
     weight_matrix = sparse.COO([src_address.data, dst_address.data],
                                remap_matrix.data,
                                shape=w_shape,
                                )
+    weight_matrix = weight_matrix.todense()
 
     # Grab the target grid lats and lons - these are 1d arrays that we need to
     # reshape to the correct size
@@ -274,15 +289,18 @@ def apply_weights(source_data, weights):
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
 
-    data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
-    #data = dask.array.matmul(stacked_source_masked, weight_matrix)
+    #data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
+    data = dask.array.tensordot(stacked_source_masked, weight_matrix, axes=1)
+    mask = dask.array.tensordot(dask.array.ma.getmaskarray(
+        stacked_source_masked), weight_matrix, axes=1)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
     # this stage the horizontal grid is still stacked into one dimension
-    out = xarray.DataArray(data,
+    out = xarray.DataArray(data, #dask.array.ma.masked_array(data, mask=(mask != 0)),
                            dims=stacked_source.dims,
-                           coords={k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
+                           coords={
+                               k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
                            name=source_data.name,
                            attrs=source_data.attrs)
 
@@ -313,23 +331,28 @@ def apply_weights(source_data, weights):
 
 
 class Regridder(object):
-    """
-    Set up the regridding operation
+    """Set up the regridding operation
 
-    For large grids you may wish to pre-calculate the weights using ESMF_RegridWeightGen, if not supplied weights will
-    be calculated using CDO.
+    Supply either both ``source_grid`` and ``dest_grid`` or just ``weights``.
+
+    For large grids you may wish to pre-calculate the weights using
+    ESMF_RegridWeightGen, if not supplied ``weights`` will be calculated from
+    ``source_grid`` and ``dest_grid`` using CDO's genbil function.
+
+    Weights may be pre-computed by an external program, or created using
+    :func:`cdo_generate_weights` or :func:`esmf_generate_weights`
 
     Args:
-        source_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Source grid / sample dataset
-        target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
-        weights (xarray.Dataset): Pre-computed interpolation weights
-        method: Regridding method
+        source_grid (:class:`coecms.grid.Grid` or :class:`xarray.DataArray`): Source grid / sample dataset
+        target_grid (:class:`coecms.grid.Grid` or :class:`xarray.DataArray`): Target grid / sample dataset
+        weights (:class:`xarray.Dataset`): Pre-computed interpolation weights
     """
 
     def __init__(self, source_grid=None, target_grid=None, weights=None):
 
         if (source_grid is None or target_grid is None) and weights is None:
-            raise Exception("Either weights or source_grid/target_grid must be supplied")
+            raise Exception(
+                "Either weights or source_grid/target_grid must be supplied")
 
         # Is there already a weights file?
         if weights is not None:
@@ -341,15 +364,13 @@ class Regridder(object):
             self.weights = cdo_generate_weights(_source_grid, _target_grid)
 
     def regrid(self, source_data):
-        """
-        Regrid the xarray.Dataset ``source_data`` to match the target grid,
-        using the weights stored in the regridder
+        """Regrid ``source_data`` to match the target grid
 
         Args:
-            source_data (xarray.Dataset): Source dataset
+            source_data (:class:`xarray.DataArray`): Source variable
 
         Returns:
-            xarray.Datset: Regridded version of the source dataset
+            :class:`xarray.DataArray` with a regridded version of the source variable
         """
 
         return apply_weights(source_data, self.weights)
@@ -364,14 +385,14 @@ def regrid(source_data, target_grid=None, weights=None):
     To save the weights use :class:`Regridder`.
 
     Args:
-        source_data (xarray.Dataset): Source dataset
-        target_grid (:class:`coecms.grid.Grid` or xarray.Dataset): Target grid / sample dataset
-        method: Regridding method
+        source_data (:class:`xarray.DataArray`): Source variable
+        target_grid (:class:`coecms.grid.Grid` or :class:`xarray.DataArray`): Target grid / sample variable
 
     Returns:
-        xarray.Datset: Regridded version of the source dataset
+        :class:`xarray.DataArray` with a regridded version of the source variable
     """
 
-    regridder = Regridder(source_data, target_grid=target_grid, weights=weights)
+    regridder = Regridder(
+        source_data, target_grid=target_grid, weights=weights)
 
     return regridder.regrid(source_data)
