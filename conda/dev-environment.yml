@@ -13,3 +13,4 @@ dependencies:
     - mule
     - cfunits
     - dask
+    - esmf # Only for testing on desktops/circleci - production gets it from /apps/esmf

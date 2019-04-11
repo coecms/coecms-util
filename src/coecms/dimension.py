@@ -31,7 +31,7 @@ def remove_degenerate_axes(coord):
     """
 
     for d in coord.dims:
-        if numpy.allclose(coord.isel({d: 0}), coord.mean(dim=d)):
+        if numpy.allclose(coord.std(dim=d), 0):
             coord = coord.mean(dim=d)
 
     return coord
