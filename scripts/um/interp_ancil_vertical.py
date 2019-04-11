@@ -16,14 +16,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Interpolate a UM ancil file vertically to a new level set
+"""
+
 from coecms.um.vertical_interpolate import vertical_interpolate
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('input')
-parser.add_argument('--output', '-o', required=True)
-parser.add_argument('--vertlevs', '-L', required=True)
-parser.add_argument('--orography', '-S', required=True)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('input', help='Input filename')
+parser.add_argument('--output', '-o', required=True, help='Output filename')
+parser.add_argument('--vertlevs', '-L', required=True, help='Target UM vertical namelist')
+parser.add_argument('--orography', '-S', required=True, help='UM Orography ancil file')
 args = parser.parse_args()
 
 vertical_interpolate(infile=args.input, outfile=args.output,
