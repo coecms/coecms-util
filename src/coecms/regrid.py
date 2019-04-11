@@ -107,6 +107,8 @@ def esmf_generate_weights(
         method='bilinear',
         extrap_method='nearestidavg',
         norm_type='dstarea',
+        line_type=None,
+        pole=None,
         ignore_unmapped=False,
         ):
     """Generate regridding weights with ESMF
@@ -155,7 +157,9 @@ def esmf_generate_weights(
             '--method', method,
             '--extrap_method', extrap_method,
             '--norm_type', norm_type,
+            #'--user_areas',
             '--no-log',
+            '--check',
             ]
 
         if isinstance(source_grid, xarray.DataArray):
@@ -169,6 +173,14 @@ def esmf_generate_weights(
         if ignore_unmapped:
             command.extend([
                 '--ignore_unmapped',
+                ])
+        if line_type is not None:
+            command.extend([
+                '--line_type',line_type,
+                ])
+        if pole is not None:
+            command.extend([
+                '--pole',pole,
                 ])
 
         out = subprocess.check_output(args=command,
@@ -216,6 +228,7 @@ def apply_weights(source_data, weights):
         dst_address = w.row - 1
         remap_matrix = w.S
         w_shape = (w.sizes['n_a'], w.sizes['n_b'])
+        s_shape = w.n_a
 
         dst_grid_shape = w.dst_grid_dims.data
         dst_grid_center_lat = w.yc_b.data.reshape(dst_grid_shape[::-1], order='C')
@@ -228,12 +241,17 @@ def apply_weights(source_data, weights):
         dst_address = w.dst_address - 1
         remap_matrix = w.remap_matrix[:,0]
         w_shape=(w.sizes['src_grid_size'], w.sizes['dst_grid_size'])
+        s_shape = w.src_grid_size
 
         dst_grid_shape = w.dst_grid_dims.data
         dst_grid_center_lat = w.dst_grid_center_lat.data.reshape(dst_grid_shape[::-1], order='C')
         dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(dst_grid_shape[::-1], order='C')
 
         axis_scale = 180.0 / math.pi # Weight lat/lon in radians
+
+    if source_data.sizes['lat'] != s_shape[0] or source_data.sizes['lon'] == s_shape[1]:
+        Exception(f"Bad regrid: Input dims {source_data.sizes}, expected "
+                "('lat', 'lon') to be {s_shape}")
 
     # Use sparse instead of scipy as it behaves better with Dask
     weight_matrix = sparse.COO([src_address.data, dst_address.data],
@@ -249,18 +267,22 @@ def apply_weights(source_data, weights):
     # Reshape the source dataset, so that the last dimension is a 1d array over
     # the lats and lons that we can multiply against the weights array
     stacked_source = source_data.stack(latlon=('lat', 'lon'))
-    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
+    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source).compute()
+    numpy.ma.set_fill_value(stacked_source_masked, 0)
 
     # With the horizontal grid as a 1d array in the last dimension,
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
-    data = dask.array.matmul(stacked_source_masked, weight_matrix)
-    mask = dask.array.matmul(dask.array.ma.getmaskarray(stacked_source_masked), weight_matrix)
+
+    data = sparse.matmul(stacked_source_masked, weight_matrix)
+    #data = numpy.matmul(stacked_source_masked.compute(), weight_matrix)
+    #data = dask.array.matmul(stacked_source_masked, weight_matrix).compute()
+    #mask = sparse.matmul(dask.array.ma.getmaskarray(stacked_source_masked).compute(), weight_matrix)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
     # this stage the horizontal grid is still stacked into one dimension
-    out = xarray.DataArray(dask.array.ma.masked_array(data, mask=(mask != 0)),
+    out = xarray.DataArray(data,
                            dims=stacked_source.dims,
                            coords={k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
                            name=source_data.name,

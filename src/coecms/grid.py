@@ -101,7 +101,7 @@ class LonLatGrid(Grid):
     A cartesian grid, with lats and lons one dimensional arrays
     """
 
-    def __init__(self, lats, lons):
+    def __init__(self, lats, lons, mask=None):
         """
         Args:
             lats (numpy.array): Grid latitudes
@@ -110,6 +110,10 @@ class LonLatGrid(Grid):
 
         self.lats = lats
         self.lons = lons
+        self.mask = mask
+
+        if self.mask is None:
+            self.mask = numpy.ones((self.lons.size, self.lats.size))
 
         if self.lats.ndim != 1 or self.lons.ndim != 1:
             raise Exception("Lons and Lats must be 1D")
@@ -132,7 +136,7 @@ class LonLatGrid(Grid):
         ds.lon.attrs['units'] = 'degrees_east'
         ds.to_netcdf(outfile)
 
-    def to_scrip(self, outfile):
+    def to_scrip(self):
         lat = self.lats
         lon = self.lons % 360
 
@@ -142,35 +146,35 @@ class LonLatGrid(Grid):
         bot = (lat.shift(lat=1) + lat) / 2.0
         bot[0] = -90
 
-        left = ((lon - (lon - lon.roll(lon=1).values) % 360) / 2.0) % 360
-        right = (lon + ((lon.roll(lon=-1).values - lon) % 360) / 2.0) % 360
+        left = ((lon - (lon - lon.roll(lon=1).values) % 360) / 2.0)
+        right = (lon + ((lon.roll(lon=-1).values - lon) % 360) / 2.0)
 
         center_lon, center_lat = numpy.meshgrid(lon, lat)
 
-        corner_lon0, corner_lat0 = numpy.meshgrid(left, top)
-        corner_lon1, corner_lat1 = numpy.meshgrid(left, bot)
-        corner_lon2, corner_lat2 = numpy.meshgrid(right, bot)
-        corner_lon3, corner_lat3 = numpy.meshgrid(right, top)
+        corner_lon0, corner_lat0 = numpy.meshgrid(left, bot)
+        corner_lon1, corner_lat1 = numpy.meshgrid(right, bot)
+        corner_lon2, corner_lat2 = numpy.meshgrid(right, top)
+        corner_lon3, corner_lat3 = numpy.meshgrid(left, top)
 
         corner_lat = numpy.array([x.reshape(-1) for x in [corner_lat0, corner_lat1, corner_lat2, corner_lat3]])
         corner_lon = numpy.array([x.reshape(-1) for x in [corner_lon0, corner_lon1, corner_lon2, corner_lon3]])
 
         scrip = xarray.Dataset(
             coords={
-                'grid_dims': (['grid_rank'], [lon.size, lat.size]),
+                'grid_dims': (['grid_rank'], numpy.array([lon.size, lat.size],dtype='i4')),
                 'grid_center_lat': (['grid_size'], center_lat.reshape(-1)),
                 'grid_center_lon': (['grid_size'], center_lon.reshape(-1)),
-                'grid_imask': (['grid_size'], numpy.ones(center_lat.size)),
+                'grid_imask': (['grid_size'], self.mask.reshape(-1).astype('i4')),
                 'grid_corner_lat': (['grid_size', 'grid_corners'], corner_lat.T),
                 'grid_corner_lon': (['grid_size', 'grid_corners'], corner_lon.T),
             })
 
-        scrip.grid_center_lat.attrs['units'] = 'degrees_north'
-        scrip.grid_center_lon.attrs['units'] = 'degrees_east'
-        scrip.grid_corner_lat.attrs['units'] = 'degrees_north'
-        scrip.grid_corner_lon.attrs['units'] = 'degrees_east'
+        scrip.grid_center_lat.attrs['units'] = 'degrees'
+        scrip.grid_center_lon.attrs['units'] = 'degrees'
+        scrip.grid_corner_lat.attrs['units'] = 'degrees'
+        scrip.grid_corner_lon.attrs['units'] = 'degrees'
 
-        scrip.to_netcdf(outfile)
+        return scrip
 
 
 class ScripGrid(Grid):
