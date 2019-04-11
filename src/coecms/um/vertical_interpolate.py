@@ -109,17 +109,3 @@ def vertical_interpolate(infile, outfile, orogfile, vertlevs):
 
     ancil_out.to_file(outfile)
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input')
-    parser.add_argument('--output','-o',required=True)
-    parser.add_argument('--vertlevs','-L',required=True)
-    parser.add_argument('--orography','-S',required=True)
-    args = parser.parse_args()
-
-    vertical_interpolate(infile=args.input, outfile=args.output,
-            orogfile=args.orography, vertlevs=args.vertlevs)
-
-if __name__ == '__main__':
-    main()
