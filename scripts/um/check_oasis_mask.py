@@ -16,6 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Checks a UM land fraction or land mask file matches the values Oasis is using
+"""
+
 import mule
 import xarray
 import matplotlib.pyplot as plt
@@ -23,8 +27,8 @@ import argparse
 import numpy
 
 
-def check_mask(oasis, um):
-    oasis_mask = xarray.open_dataset(oasis)['um_t.msk']
+def check_mask(oasis, um, oasis_grid='um_t'):
+    oasis_mask = xarray.open_dataset(oasis)[f'{oasis_grid}.msk']
 
     um_mask = numpy.where(mule.AncilFile.from_file(
         um).fields[0].get_data() < 1, 1, 0)
@@ -35,9 +39,10 @@ def check_mask(oasis, um):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('um')
-    parser.add_argument('oasis')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('um', help='UM land fraction or land mask')
+    parser.add_argument('oasis', help='Oasis masks.nc file')
+    parser.add_argument('--oasis-grid', default='um_t', help='Oasis grid name for the UM (default "um_t")')
     args = parser.parse_args()
 
-    check_mask(args.oasis, args.um)
+    check_mask(args.oasis, args.um, oasis_grid=args.oasis_grid)
