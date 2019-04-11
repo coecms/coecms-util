@@ -28,12 +28,18 @@ import mule
 from coecms.regrid import esmf_generate_weights, regrid
 
 
-def latlon_scrip_grid(mask):
+def latlon_scrip_grid(mask, planet_radius=6371229.0):
     """
     Create a SCRIP description of a lat-lon grid from a mask
 
+    Coordinate information is read from the mask's coordinates. Regular spacing of coordinates is assumed.
+
     Args:
         mask (xarray.DataArray): Source grid mask
+        planet_radius (float): Planet radius for cell area calculation
+
+    Returns:
+        xarray.DataArray containing the SCRIP description
     """
     dims = ['ny', 'nx']
 
@@ -65,9 +71,10 @@ def latlon_scrip_grid(mask):
     dlonr = dlon / 180.0 * np.pi
     la_low = np.clip((la - dlat/2) / 180 * np.pi, -np.pi/2, np.pi/2)
     la_high = np.clip((la + dlat/2) / 180 * np.pi, -np.pi/2, np.pi/2)
-    area = xarray.DataArray(6371229.0**2 * dlonr * (np.sin(la_high) - np.sin(la_low)), dims=dims)
+
+    area = xarray.DataArray(planet_radius**2 * dlonr * (np.sin(la_high) - np.sin(la_low)), dims=dims)
     area.attrs['units'] = 'm^2'
-    area.attrs['planet_radius'] = 6371229.0
+    area.attrs['planet_radius'] = planet_radius
 
     ds = xarray.Dataset({'grid_center_lat': la, 'grid_center_lon': lo, 'grid_corner_lon': clo, 'grid_corner_lat': cla, 'grid_imask': mask, 'grid_area': area, 'grid_dims': grid_dims})
     ds = ds.stack(grid_size=('ny','nx')).reset_index('grid_size')
@@ -81,6 +88,12 @@ def latlon_scrip_grid(mask):
 def um_endgame_scrip_grids(frac_t):
     """
     Create SCRIP descriptions of the UM ENDGAME t, u and v grids from the land fraction
+
+    Args:
+        frac_t (xarray.DataArray): UM land fractions on the theta grid
+
+    Returns:
+        dict mapping UM grid names to SCRIP descriptions of that grid
     """
     mask_t = xarray.where(frac_t < 1.0, 0, 1).astype('i4')
 
@@ -106,8 +119,10 @@ def mom_t_scrip_grid(gridspec):
     Create a SCRIP description of the MOM tracer grid
 
     Args:
+        gridspec (xarray.DataArray): MOM grid_spec.nc data
 
-        gridspec: MOM grid_spec.nc data
+    Returns:
+        xarray.DataArray containing the SCRIP description
     """
     grid_dims = xarray.DataArray(list(reversed(gridspec.wet.shape)), dims='grid_rank')
 
@@ -142,7 +157,11 @@ def merge_scrip_for_oasis(scrip_grids):
     Merge a set of SCRIP grids into OASIS grid description files
 
     Args:
-        scrip_grids: A dict of SCRIP descriptions, keys are OASIS grid names (4 characters)
+        scrip_grids: A dict mapping OASIS grid names to SCRIP descriptions
+
+    Returns:
+        dict mappining keys 'masks', 'grids' and 'areas' to xarray.DataArrays
+        with the relevant fields copied from the SCRIP descriptions
     """
     masks = xarray.Dataset()
     grids = xarray.Dataset()
@@ -178,8 +197,18 @@ def merge_scrip_for_oasis(scrip_grids):
     return {'masks': masks, 'grids': grids, 'areas': areas}
 
 
-
 def rename_weights_esmf_to_scrip(ds):
+    """
+    Rename fields in a ESMF_RegridWeightGen weights file to the format used by
+    SCRIP
+
+    Args:
+        ds (xarray.DataArray): ESMF weights data
+
+    Returns:
+        xarray.DataArray with SCRIP field names
+    """
+
     ds = ds.rename({
         'n_s': 'num_links',
         'n_a': 'src_grid_size',
@@ -209,7 +238,15 @@ def rename_weights_esmf_to_scrip(ds):
 
 def create_um_lfrac_from_mom(gridspec, targetgrid):
     """
-    Sets up UM mask based on a MOM grid
+    Sets up UM land fraction consistent with the MOM mask by interpolating the
+    MOM 'wet' field conservatively
+
+    Args:
+        gridspec (xarray.DataArray): MOM grid_spec.nc data
+        targetgrid (xarray.DataArray): Sample field on the UM target grid
+
+    Returns:
+        xarray.DataArray containing the UM land fraction on the target grid
     """
     src_scrip = mom_t_scrip_grid(gridspec)
     tgt_scrip = latlon_scrip_grid(targetgrid)
@@ -270,10 +307,19 @@ class LFracCorrector(mule.DataOperator):
         return data
 
 
-def correct_ancils(lfrac):
-    imask = '/projects/access/umdir/ancil/atmos/n48e/orca1/land_sea_mask/etop01/v1/qrparm.mask'
-    iorog = '/projects/access/umdir/ancil/atmos/n48e/orca1/orography/globe30/v1/qrparm.orog'
-    ifrac = '/projects/access/umdir/ancil/atmos/n48e/orca1/land_sea_mask/etop01/v1/qrparm.landfrac'
+def correct_ancils(lfrac, mask_ancil, frac_ancil, outdir):
+    """
+    Create new UM ancil files by replacing the land fraction and mask fields in
+    ``mask_ancil`` and ``frac_ancil`` with the values from ``lfrac``
+
+    Creates new files ``qrparm.mask`` and ``qrparm.landfrac`` in ``outdir``
+
+    Args:
+        lfrac (xarray.DataArray): Land fractions on the UM grid
+        mask_ancil (string): Path to the source mask ancil file
+        lfrac_ancil (string): Path to the source lfrac ancil file
+        outdir (string): Output directory for new ancil files
+    """
 
     lcorrect = LFracCorrector(lfrac)
 
@@ -284,7 +330,7 @@ def correct_ancils(lfrac):
             ff_out.fields.append(lcorrect(f))
         ff_out.to_file(outfile)
 
-    do_correct(imask, 'qrparm.mask')
-    do_correct(ifrac, 'qrparm.landfrac')
+    do_correct(mask_ancil, os.path.join(outdir, 'qrparm.mask'))
+    do_correct(frac_ancil, os.path.join(outdir, 'qrparm.landfrac'))
 
 

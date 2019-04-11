@@ -104,7 +104,6 @@ def cdo_generate_weights(source_grid, target_grid,
 
     except subprocess.CalledProcessError as e:
         # Print the CDO error message
-        #print(e.stderr.decode(), file=sys.stderr)
         print(e.output.decode(), file=sys.stderr)
         raise
 
@@ -142,12 +141,9 @@ def esmf_generate_weights(
             ESMF_RegridWeightGen
     """
     # Make some temporary files that we'll feed to ESMF
-    #source_file = tempfile.NamedTemporaryFile()
-    #target_file = tempfile.NamedTemporaryFile()
+    source_file = tempfile.NamedTemporaryFile()
+    target_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
-
-    source_file = open('sscrip.nc','wb')
-    target_file = open('tscrip.nc','wb')
 
     rwg = 'ESMF_RegridWeightGen'
 
