@@ -19,6 +19,7 @@ from .dimension import remove_degenerate_axes
 from .grid import *
 
 from datetime import datetime
+from shutil import which
 import dask.array
 import math
 import os
@@ -28,18 +29,12 @@ import sys
 import tempfile
 import xarray
 
-# Python 2 compat
-try:
-    from shutil import which
-except ImportError:
-    from whichcraft import which
-
 
 def cdo_generate_weights(source_grid, target_grid,
-                         method='bil',
-                         extrapolate=True,
-                         remap_norm='fracarea',
-                         remap_area_min=0.0):
+        method='bil',
+        extrapolate=True,
+        remap_norm='fracarea',
+        remap_area_min=0.0):
     """
     Generate weights for regridding using CDO
 
@@ -69,8 +64,7 @@ def cdo_generate_weights(source_grid, target_grid,
         :obj:`xarray.Dataset` with regridding weights
     """
 
-    supported_methods = ['bic', 'bil', 'con',
-                         'con2', 'dis', 'laf', 'nn', 'ycon']
+    supported_methods = ['bic','bil','con','con2','dis','laf','nn','ycon']
     if method not in supported_methods:
         raise Exception
     if remap_norm not in ['fracarea', 'destarea']:
@@ -110,7 +104,6 @@ def cdo_generate_weights(source_grid, target_grid,
 
     except subprocess.CalledProcessError as e:
         # Print the CDO error message
-        #print(e.stderr.decode(), file=sys.stderr)
         print(e.output.decode(), file=sys.stderr)
         raise
 
@@ -126,15 +119,19 @@ def esmf_generate_weights(
         target_grid,
         method='bilinear',
         extrap_method='nearestidavg',
-):
+        norm_type='dstarea',
+        line_type=None,
+        pole=None,
+        ignore_unmapped=False,
+        ):
     """Generate regridding weights with ESMF
 
-    For details see https://www.earthsystemcog.org/projects/esmf/regridding
+    https://www.earthsystemcog.org/projects/esmf/regridding
 
     Args:
-        source_grid (:obj:`xarray.DataArray`): Source grid. If masked the mask
+        source_grid (:obj:`xarray.Dataarray`): Source grid. If masked the mask
             will be used in the regridding
-        target_grid (:obj:`xarray.DataArray`): Target grid. If masked the mask
+        target_grid (:obj:`xarray.Dataarray`): Target grid. If masked the mask
             will be used in the regridding
         method (str): ESMF Regridding method, see ``ESMF_RegridWeightGen --help``
         extrap_method (str): ESMF Extrapolation method, see ``ESMF_RegridWeightGen --help``
@@ -148,14 +145,14 @@ def esmf_generate_weights(
     target_file = tempfile.NamedTemporaryFile()
     weight_file = tempfile.NamedTemporaryFile()
 
-    # If ESMF_rwg is not on $PATH, use the version in Raijin's /apps
     rwg = 'ESMF_RegridWeightGen'
+
     if which(rwg) is None:
         rwg = '/apps/esmf/7.1.0r-intel/bin/binO/Linux.intel.64.openmpi.default/ESMF_RegridWeightGen'
 
-    # Set _FillValue to something other than NAN
     if '_FillValue' not in source_grid.encoding:
         source_grid.encoding['_FillValue'] = -999999
+
     if '_FillValue' not in target_grid.encoding:
         target_grid.encoding['_FillValue'] = -999999
 
@@ -163,26 +160,49 @@ def esmf_generate_weights(
         source_grid.to_netcdf(source_file.name)
         target_grid.to_netcdf(target_file.name)
 
-        # Run ESMF_rwg
         command = [rwg,
-                   '--source', source_file.name,
-                   '--destination', target_file.name,
-                   '--weight', weight_file.name,
-                   '--method', method,
-                   '--extrap_method', extrap_method,
-                   '--ignore_unmapped',
-                   '--src_missingvalue', source_grid.name,
-                   '--dst_missingvalue', target_grid.name,
-                   '--no-log',
-                   ]
+            '--source', source_file.name,
+            '--destination', target_file.name,
+            '--weight', weight_file.name,
+            '--method', method,
+            '--extrap_method', extrap_method,
+            '--norm_type', norm_type,
+            #'--user_areas',
+            '--no-log',
+            '--check',
+            ]
+
+        if isinstance(source_grid, xarray.DataArray):
+            command.extend([
+                '--src_missingvalue', source_grid.name,
+                ])
+        if isinstance(target_grid, xarray.DataArray):
+            command.extend([
+                '--dst_missingvalue', target_grid.name,
+                ])
+        if ignore_unmapped:
+            command.extend([
+                '--ignore_unmapped',
+                ])
+        if line_type is not None:
+            command.extend([
+                '--line_type',line_type,
+                ])
+        if pole is not None:
+            command.extend([
+                '--pole',pole,
+                ])
 
         out = subprocess.check_output(args=command,
-                                      stderr=subprocess.PIPE)
+            stderr=subprocess.PIPE)
         print(out.decode('utf-8'))
 
-        # Grab the weights
         weights = xarray.open_dataset(weight_file.name)
         return weights
+
+    except subprocess.CalledProcessError as e:
+        print(e.output.decode('utf-8'))
+        raise
 
     finally:
         # Clean up the temporary files
@@ -248,7 +268,7 @@ def apply_weights(source_data, weights):
                                remap_matrix.data,
                                shape=w_shape,
                                )
-    weight_matrix = dask.array.from_array(weight_matrix, chunks=(100, 100))
+    weight_matrix = weight_matrix.todense()
 
     # Grab the target grid lats and lons - these are 1d arrays that we need to
     # reshape to the correct size
@@ -259,18 +279,21 @@ def apply_weights(source_data, weights):
     # the lats and lons that we can multiply against the weights array
     stacked_source = source_data.stack(latlon=('lat', 'lon'))
     stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
+    dask.array.ma.set_fill_value(stacked_source_masked, 0)
 
     # With the horizontal grid as a 1d array in the last dimension,
     # dask.array.matmul will multiply the horizontal grid by the weights for
     # each time/level for free, so we can avoid manually looping
-    data = dask.array.matmul(stacked_source_masked, weight_matrix)
-    mask = dask.array.matmul(dask.array.ma.getmaskarray(
-        stacked_source_masked), weight_matrix)
+
+    #data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
+    data = dask.array.tensordot(stacked_source_masked, weight_matrix, axes=1)
+    mask = dask.array.tensordot(dask.array.ma.getmaskarray(
+        stacked_source_masked), weight_matrix, axes=1)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
     # this stage the horizontal grid is still stacked into one dimension
-    out = xarray.DataArray(dask.array.ma.masked_array(data, mask=(mask != 0)),
+    out = xarray.DataArray(data, #dask.array.ma.masked_array(data, mask=(mask != 0)),
                            dims=stacked_source.dims,
                            coords={
                                k: v for k, v in stacked_source.coords.items() if k != 'latlon'},

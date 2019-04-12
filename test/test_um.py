@@ -15,7 +15,7 @@
 # limitations under the License.
 from __future__ import print_function
 
-from coecms.um import *
+from coecms.um.create_ancillary import *
 
 import xarray
 import numpy

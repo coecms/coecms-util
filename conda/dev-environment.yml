@@ -14,3 +14,9 @@ dependencies:
     - cfunits
     - dask
     - esmf # Only for testing on desktops/circleci - production gets it from /apps/esmf
+    - xarray
+    - netcdf4
+    - sparse
+    - iris
+    - f90nml
+    - python-stratify

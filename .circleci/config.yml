@@ -54,10 +54,6 @@ run_conda: &run_conda
 version: 2
 
 jobs:
-    python2:
-        environment:
-            PYTHON_VER=2.7
-        <<: *run_pytest
     python3:
         environment:
             PYTHON_VER=3.6
@@ -71,6 +67,5 @@ workflows:
     version: 2
     pytest:
         jobs:
-            - python2
             - python3
             - conda3

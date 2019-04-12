@@ -13,6 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+:mod:`coecms.um.create_ancillary`
+------------------------------------------------------------------------------------------
+
+Functions for creating and modifying UM ancillary files
+"""
+
 from __future__ import print_function
 
 from coecms.dimension import identify_lat_lon, identify_time

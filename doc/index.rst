@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to CLEX CMS Utility Library's documentation!
-==================================
+====================================================
 
 .. toctree::
    :maxdepth: 2
