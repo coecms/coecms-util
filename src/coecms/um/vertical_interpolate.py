@@ -15,6 +15,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+:mod:`coecms.um.vertical_interpolate`
+------------------------------------------------------------------------------------------
+
+Functions for vertical interpolation of UM files
+"""
 
 import mule
 import pandas
@@ -26,6 +32,12 @@ def vertical_interpolate(infile, outfile, orogfile, vertlevs):
     """
     Perform a vertical interpolation of ancil file 'infile', using the level
     definition namelist 'vertlevs'
+
+    Args:
+        infile (string): Path to input UM ancil file
+        outfile (string): Path to output UM ancil file
+        orogfile (string): Path to UM orography for true level calculations
+        vertlevs (string): Path to UM vertical namelist file for target levels
     """
 
     ancil = mule.AncilFile.from_file(infile)

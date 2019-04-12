@@ -1,21 +1,27 @@
 #!/usr/bin/env python
+# Copyright 2018 
+# 
+# author:  <scott.wales@unimelb.edu.au>
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
-Copyright 2018 
+:mod:`coecms.um.um2oasis`
+------------------------------------------------------------------------------------------
 
-author:  <scott.wales@unimelb.edu.au>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Functions for creating OASIS regridding files
 """
+
 from __future__ import print_function
 
 import iris
@@ -278,14 +284,27 @@ def create_um_lfrac_from_mom(gridspec, targetgrid):
 
 
 class LFracCorrector(mule.DataOperator):
+    """
+    Mule operator to override the land mask and land fraction fields
+    """
     def __init__(self, lfrac):
+        """
+        Args:
+            lfrac (xarray.DataArray): New land fraction field
+        """
         super()
-        self.lfrac = lfrac
+        self.lfrac = lfrac #: Target land fraction
 
     def new_field(self, source):
+        """
+        Creates a new field
+        """
         return source.copy()
 
     def transform(self, source, dest):
+        """
+        Replaces data in the field with the values from `self.lfrac`
+        """
         data = source.get_data()
         data_orig = numpy.copy(data)
 

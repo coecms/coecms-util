@@ -17,3 +17,6 @@ dependencies:
     - xarray
     - netcdf4
     - sparse
+    - iris
+    - f90nml
+    - python-stratify
