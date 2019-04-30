@@ -267,6 +267,8 @@ def apply_weights(source_data, weights):
         dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(
             dst_grid_shape[::-1], order='C')
 
+        dst_mask = w.dst_grid_imask
+
         axis_scale = 180.0 / math.pi  # Weight lat/lon in radians
 
     print(weights)
@@ -294,7 +296,11 @@ def apply_weights(source_data, weights):
     # the lats and lons that we can multiply against the weights array
     stacked_source = source_data.stack(latlon=('lat', 'lon'))
     stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
-    dask.array.ma.set_fill_value(stacked_source_masked, -1e99)
+
+    if stacked_source_masked.dtype.kind == 'i':
+        dask.array.ma.set_fill_value(stacked_source_masked, numpy.iinfo(stacked_source_masked.dtype).min)
+    else:
+        dask.array.ma.set_fill_value(stacked_source_masked, -1e99)
 
     # With the horizontal grid as a 1d array in the last dimension,
     # dask.array.matmul will multiply the horizontal grid by the weights for
@@ -302,8 +308,8 @@ def apply_weights(source_data, weights):
 
     #data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
     data = dask.array.tensordot(stacked_source_masked, weight_matrix, axes=1)
-    mask = dask.array.tensordot(dask.array.ma.getmaskarray(
-        stacked_source_masked), weight_matrix, axes=1)
+    #mask = dask.array.tensordot(dask.array.ma.getmaskarray(
+    #    stacked_source_masked), weight_matrix, axes=1)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at
