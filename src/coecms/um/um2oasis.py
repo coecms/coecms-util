@@ -1,14 +1,14 @@
 #!/usr/bin/env python
-# Copyright 2018 
-# 
+# Copyright 2018
+#
 # author:  <scott.wales@unimelb.edu.au>
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,10 +24,8 @@ Functions for creating OASIS regridding files
 
 from __future__ import print_function
 
-import iris
 import xarray
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas
 import numpy
 import mule
@@ -63,8 +61,6 @@ def latlon_scrip_grid(mask, planet_radius=6371229.0):
     la = xarray.DataArray(la, dims=dims)
     la.attrs['units'] = 'degrees'
 
-    d1 = np.stack([lo, lo, lo, lo])
-    d2 = np.stack([lo-dlon/2, lo+dlon/2, lo+dlon/2, lo-dlon/2])
     # Find the cell corners (starting at the bottom left, working anticlockwise)
     clo = xarray.DataArray(np.stack([lo-dlon/2, lo+dlon/2, lo+dlon/2, lo-dlon/2]),
             dims=['grid_corners', dims[0], dims[1]])
@@ -257,8 +253,6 @@ def create_um_lfrac_from_mom(gridspec, targetgrid):
     src_scrip = mom_t_scrip_grid(gridspec)
     tgt_scrip = latlon_scrip_grid(targetgrid)
 
-    mom_field = gridspec.wet.values
-
     src_scrip['grid_imask'] = src_scrip.grid_imask * 0 + 1
     tgt_scrip['grid_imask'] = tgt_scrip.grid_imask * 0 + 1
 
@@ -272,7 +266,6 @@ def create_um_lfrac_from_mom(gridspec, targetgrid):
             )
 
     mom_wet_on_um = regrid(xarray.DataArray(gridspec.wet.values, dims=['lat', 'lon']), weights=weights)
-    um_wet_frac = mom_wet_on_um
 
     um_land_frac = 1 - mom_wet_on_um
 
@@ -311,7 +304,7 @@ class LFracCorrector(mule.DataOperator):
         if source.lbuser4 == 30:
             # Land mask
             data = numpy.where(self.lfrac > 0, 1, 0)
-            
+
         if source.lbuser4 == 33:
             # Orography - set to minimum 1 where there's land
             data = numpy.where(numpy.logical_and(data < 0, self.lfrac > 0), 1, data)

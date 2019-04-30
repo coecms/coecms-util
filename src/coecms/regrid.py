@@ -204,6 +204,10 @@ def esmf_generate_weights(
         print(e.output.decode('utf-8'))
         raise
 
+    except subprocess.CalledProcessError as e:
+        print(e.output.decode('utf-8'))
+        raise
+
     finally:
         # Clean up the temporary files
         source_file.close()
@@ -298,8 +302,8 @@ def apply_weights(source_data, weights):
 
     #data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
     data = dask.array.tensordot(stacked_source_masked, weight_matrix, axes=1)
-    #mask = dask.array.tensordot(dask.array.ma.getmaskarray(
-    #    stacked_source_masked), weight_matrix, axes=1)
+    mask = dask.array.tensordot(dask.array.ma.getmaskarray(
+        stacked_source_masked), weight_matrix, axes=1)
 
     # Convert the regridded data into a xarray.DataArray. A bit of trickery is
     # required with the coordinates to get them back into two dimensions - at

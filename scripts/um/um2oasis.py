@@ -48,7 +48,7 @@ def main():
 
     lfrac = create_um_lfrac_from_mom(mom_gridspec, um_grid)
     correct_ancils(lfrac, mask_ancil=args.lmask, frac_ancil=args.lfrac, outdir=args.output)
-    
+
     scrip_grids = um_endgame_scrip_grids(lfrac)
     scrip_grids['momt'] = mom_t_scrip_grid(mom_gridspec)
 
