@@ -83,15 +83,12 @@ class Grid(object):
         automatically.
         """
 
-    def to_scrip(self, outfile):
+    def to_scrip(self):
         """
         Create a SCRIP file using the grid
 
-        Args:
-            outfile: Path or File-like object to write to
-
-        Note that if `outfile` is a file object it will be closed
-        automatically.
+        Returns:
+            xarray.Dataset containing SCRIP grid description
         """
         raise NotImplementedError
 
@@ -187,5 +184,5 @@ class ScripGrid(Grid):
     def to_netcdf(self, outfile):
         self._grid.to_netcdf(outfile)
 
-    def to_scrip(self, outfile):
-        self._grid.to_netcdf(outfile)
+    def to_scrip(self):
+        return self._grid

@@ -20,7 +20,6 @@
 Clean up a UM astart file, removing invalid values (e.g. negative temperatures)
 """
 
-import argparse
 import mule
 import numpy
 import argparse
