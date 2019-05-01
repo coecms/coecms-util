@@ -289,12 +289,16 @@ def apply_weights(source_data, weights):
 
     # Remove the spatial axes, apply the weights, add the spatial axes back
     source_array = source_data.data
-
     if isinstance(source_array, dask.array.Array):
         source_array = dask.array.reshape(source_array,
                 kept_shape +  [-1])
     else:
         source_array = numpy.reshape(source_array, kept_shape + [-1])
+
+    # Handle input mask
+    dask.array.ma.set_fill_value(source_array, 1e20)
+    source_array = dask.array.ma.fix_invalid(source_array)
+    source_array = dask.array.ma.filled(source_array)
 
     target_dask = dask.array.tensordot(source_array, sparse_weights, axes=1)
     target_dask = dask.array.reshape(target_dask,
@@ -303,9 +307,14 @@ def apply_weights(source_data, weights):
     # Create a new DataArray for the output
     target_da = xarray.DataArray(target_dask,
                                  dims=kept_dims + ['i', 'j'],
+                                 coords={k:v for k,v in source_data.coords.items()
+                                     if set(v.dims).issubset(kept_dims)},
                                  name=source_data.name)
     target_da.coords['lat'] = xarray.DataArray(dst_grid_center_lat, dims=['i','j'])
     target_da.coords['lon'] = xarray.DataArray(dst_grid_center_lon, dims=['i','j'])
+
+    # Mask
+    target_da = target_da.where(dst_mask.data.reshape([dst_grid_shape[1], dst_grid_shape[0]]) == 1)
 
     # Clean up coordinates
     target_da.coords['lat'] = remove_degenerate_axes(target_da.lat)
@@ -325,8 +334,6 @@ def apply_weights(source_data, weights):
     target_da.coords['lat'].attrs['standard_name'] = 'latitude'
     target_da.coords['lon'].attrs['units'] = 'degrees_east'
     target_da.coords['lon'].attrs['standard_name'] = 'longitude'
-
-    print(target_da)
 
     return target_da
 

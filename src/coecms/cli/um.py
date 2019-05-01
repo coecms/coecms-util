@@ -18,6 +18,7 @@
 
 from .main import cli
 from ..regrid import regrid, esmf_generate_weights
+from ..um.create_ancillary import create_surface_ancillary
 import click
 import pandas
 import mule
@@ -25,6 +26,7 @@ import iris
 import xarray
 from dask.diagnostics import ProgressBar
 import dask.distributed
+import matplotlib.pyplot as plt
 
 @cli.group()
 def um():
@@ -65,14 +67,10 @@ def validate_um_ancil(ctx, param, value):
               type=click.Path(exists=True, dir_okay=False))
 @click.option('--output', required=True,
               type=click.Path(writable=True, dir_okay=False))
-@click.option('--frequency', default='24', type=click.Choice(['6','12','24']))
-def era_sst(start_date, end_date, target_mask, output, frequency):
+def era_sst(start_date, end_date, target_mask, output):
     """
     Create ancil files from ERA reanalysis data
     """
-
-    #c = dask.distributed.Client(n_workers=1, threads_per_worker=1, memory_limit='500mb')
-    #print(c)
 
     mule_mask = mule.load_umfile(target_mask)
     global_mask = mule_mask.fixed_length_header.horiz_grid_type == 0
@@ -89,36 +87,33 @@ def era_sst(start_date, end_date, target_mask, output, frequency):
     mask.lon.attrs['units'] = 'degrees_east'
     mask.lat.attrs['units'] = 'degrees_north'
 
-    with ProgressBar():
 
-        file_start = start_date - pandas.offsets.MonthBegin()
-        file_end = end_date + pandas.offsets.MonthEnd()
-        file_a = pandas.date_range(file_start,file_end,freq='MS')
-        file_b = file_a + pandas.offsets.MonthEnd()
+    file_start = start_date - pandas.offsets.MonthBegin()
+    file_end = end_date + pandas.offsets.MonthEnd()
+    file_a = pandas.date_range(file_start,file_end,freq='MS')
+    file_b = file_a + pandas.offsets.MonthEnd()
 
-        dates = [f'{a.strftime("%Y%m%d")}_{b.strftime("%Y%m%d")}'
-                 for a,b in zip(file_a, file_b)]
+    dates = [f'{a.strftime("%Y%m%d")}_{b.strftime("%Y%m%d")}'
+             for a,b in zip(file_a, file_b)]
 
-        # Read and slice the source data
-        tos = xarray.open_mfdataset(['/g/data1a/ub4/erai/netcdf/6hr/ocean/'
-                                     'oper_an_sfc/v01/tos/'
-                                     'tos_6hrs_ERAI_historical_an-sfc_'+d+'.nc'
-                                     for d in dates],
-                                     chunks={'time': 1, 'lat': 10})
-        sic = xarray.open_mfdataset(['/g/data1a/ub4/erai/netcdf/6hr/seaIce/'
-                                     'oper_an_sfc/v01/sic/'
-                                     'sic_6hrs_ERAI_historical_an-sfc_'+d+'.nc'
-                                     for d in dates],
-                                     chunks={'time': 1, 'lat': 10})
-        ds = xarray.Dataset({'tos': tos.tos, 'sic': sic.sic})
-        ds = ds.sel(time=slice(start_date, end_date))
+    # Read and slice the source data
+    tos = xarray.open_mfdataset(['/g/data1a/ub4/erai/netcdf/6hr/ocean/'
+                                 'oper_an_sfc/v01/tos/'
+                                 'tos_6hrs_ERAI_historical_an-sfc_'+d+'.nc'
+                                 for d in dates],
+                                 chunks={'time': 1,})
+    sic = xarray.open_mfdataset(['/g/data1a/ub4/erai/netcdf/6hr/seaIce/'
+                                 'oper_an_sfc/v01/sic/'
+                                 'sic_6hrs_ERAI_historical_an-sfc_'+d+'.nc'
+                                 for d in dates],
+                                 chunks={'time': 1,})
+    ds = xarray.Dataset({'tos': tos.tos, 'sic': sic.sic})
+    ds = ds.sel(time=slice(start_date, end_date))
 
-        print(ds)
+    weights = esmf_generate_weights(tos.tos.isel(time=0), mask, method='patch')
+    newds = regrid(ds, weights=weights)
 
-        weights = esmf_generate_weights(tos.isel(time=0), mask, method='patch')
-        newds = regrid(ds, weights=weights)
+    print(newds)
 
-        print(newds)
-
-        newds['time'] = newds['time'].astype('i4')
-        newds.isel(time=slice(0,50)).to_netcdf(output)
+    ancil = create_surface_ancillary(newds, {'tos': 507, 'sic': 31})
+    ancil.to_file(output)
