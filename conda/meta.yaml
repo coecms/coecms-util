@@ -16,7 +16,7 @@ requirements:
         - python
         - cdo>=1.9.4
         - cfunits
-        - dask
+        - dask>=1.2.0
         - mule
         - netcdf4
         - numpy

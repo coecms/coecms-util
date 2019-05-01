@@ -15,7 +15,7 @@
 # limitations under the License.
 from __future__ import print_function
 
-from .dimension import remove_degenerate_axes
+from .dimension import remove_degenerate_axes, identify_lat_lon
 from .grid import *
 
 from datetime import datetime
@@ -271,89 +271,64 @@ def apply_weights(source_data, weights):
 
         axis_scale = 180.0 / math.pi  # Weight lat/lon in radians
 
-    print(weights)
+    # Check lat/lon are the last axes
+    source_lat, source_lon = identify_lat_lon(source_data)
+    if not (source_lat.name in source_data.dims[-2:] and
+            source_lon.name in source_data.dims[-2:]):
+        raise Exception("Last two dimensions should be spatial coordinates,"
+                        f" got {source_data.dims[-2:]}")
 
-    # Use sparse instead of scipy as it behaves better with Dask
+    kept_shape = list(source_data.shape[0:-2])
+    kept_dims = list(source_data.dims[0:-2])
+
+    # Create a sparse array from the weights
     sparse_weights = sparse.COO([src_address.data, dst_address.data],
                                remap_matrix.data,
                                shape=w_shape,
                                )
-    def sparse_to_dask(arr, block_info=None):
-        x0 = block_info[0]['array-location'][0]
-        x1 = block_info[0]['array-location'][1]
-        return sparse_weights[x0[0]:x0[1], x1[0]:x1[1]].todense()
 
-    template = dask.array.empty(sparse_weights.shape, chunks=(1000,1000), dtype=sparse_weights.dtype)
-    weight_matrix = template.map_blocks(sparse_to_dask, dtype=sparse_weights.dtype)
+    # Remove the spatial axes, apply the weights, add the spatial axes back
+    source_array = source_data.data
 
-
-    # Grab the target grid lats and lons - these are 1d arrays that we need to
-    # reshape to the correct size
-    lat = xarray.DataArray(dst_grid_center_lat, name='lat', dims=['i', 'j'])
-    lon = xarray.DataArray(dst_grid_center_lon, name='lon', dims=['i', 'j'])
-
-    # Reshape the source dataset, so that the last dimension is a 1d array over
-    # the lats and lons that we can multiply against the weights array
-    stacked_source = source_data.stack(latlon=('lat', 'lon'))
-    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
-
-    if stacked_source_masked.dtype.kind == 'i':
-        dask.array.ma.set_fill_value(stacked_source_masked, numpy.iinfo(stacked_source_masked.dtype).min)
+    if isinstance(source_array, dask.array.Array):
+        source_array = dask.array.reshape(source_array,
+                kept_shape +  [-1])
     else:
-        dask.array.ma.set_fill_value(stacked_source_masked, -1e99)
+        source_array = numpy.reshape(source_array, kept_shape + [-1])
 
-    # With the horizontal grid as a 1d array in the last dimension,
-    # dask.array.matmul will multiply the horizontal grid by the weights for
-    # each time/level for free, so we can avoid manually looping
+    target_dask = dask.array.tensordot(source_array, sparse_weights, axes=1)
+    target_dask = dask.array.reshape(target_dask,
+            kept_shape + [dst_grid_shape[1], dst_grid_shape[0]])
 
-    #data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
-    data = dask.array.tensordot(stacked_source_masked, weight_matrix, axes=1)
-    #mask = dask.array.tensordot(dask.array.ma.getmaskarray(
-    #    stacked_source_masked), weight_matrix, axes=1)
+    # Create a new DataArray for the output
+    target_da = xarray.DataArray(target_dask,
+                                 dims=kept_dims + ['i', 'j'],
+                                 name=source_data.name)
+    target_da.coords['lat'] = xarray.DataArray(dst_grid_center_lat, dims=['i','j'])
+    target_da.coords['lon'] = xarray.DataArray(dst_grid_center_lon, dims=['i','j'])
 
-    # Convert the regridded data into a xarray.DataArray. A bit of trickery is
-    # required with the coordinates to get them back into two dimensions - at
-    # this stage the horizontal grid is still stacked into one dimension
-    out = xarray.DataArray(data, #dask.array.ma.masked_array(data, mask=(mask != 0)),
-                           dims=stacked_source.dims,
-                           coords={
-                               k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
-                           name=source_data.name,
-                           attrs=source_data.attrs)
-    dst_mask = dask.array.broadcast_to(dst_mask, out.shape)
-    out = out.where(dst_mask == 1)
-
-
-    # Add the new grid coordinates, stacking them the same way we stacked the source data
-    out.coords['lat'] = lat.stack(latlon=('i', 'j'))
-    out.coords['lon'] = lon.stack(latlon=('i', 'j'))
-
-    # Now the coordinates have been added we can unstack the 'latlon' dimension
-    # back into ('i', 'j').
-    unstacked_out = out.unstack('latlon')
-
-    # The coordinates in the weight file are 2d. If this is just a lat-lon grid
-    # we should remove the unneccessary dimension from the coordinates
-    unstacked_out.coords['lat'] = remove_degenerate_axes(unstacked_out.lat)
-    unstacked_out.coords['lon'] = remove_degenerate_axes(unstacked_out.lon)
+    # Clean up coordinates
+    target_da.coords['lat'] = remove_degenerate_axes(target_da.lat)
+    target_da.coords['lon'] = remove_degenerate_axes(target_da.lon)
 
     # Convert to degrees if needed
-    unstacked_out.coords['lat'] = unstacked_out.lat * axis_scale
-    unstacked_out.coords['lon'] = unstacked_out.lon * axis_scale
+    target_da.coords['lat'] = target_da.lat * axis_scale
+    target_da.coords['lon'] = target_da.lon * axis_scale
 
-    if unstacked_out.coords['lat'].ndim == 1 and unstacked_out.coords['lon'].ndim == 1:
-        unstacked_out = unstacked_out.drop(['i','j'])
-        unstacked_out = unstacked_out.rename({'i': 'lat', 'j': 'lon'})
+    # Regular grids should use 'lat', 'lon' as dimension names, curved grids
+    # use 'i', 'j'
+    if target_da.coords['lat'].ndim == 1 and target_da.coords['lon'].ndim == 1:
+        target_da = target_da.rename({'i': 'lat', 'j': 'lon'})
 
     # Add metadata to the coordinates
-    unstacked_out.coords['lat'].attrs['units'] = 'degrees_north'
-    unstacked_out.coords['lat'].attrs['standard_name'] = 'latitude'
-    unstacked_out.coords['lon'].attrs['units'] = 'degrees_east'
-    unstacked_out.coords['lon'].attrs['standard_name'] = 'longitude'
+    target_da.coords['lat'].attrs['units'] = 'degrees_north'
+    target_da.coords['lat'].attrs['standard_name'] = 'latitude'
+    target_da.coords['lon'].attrs['units'] = 'degrees_east'
+    target_da.coords['lon'].attrs['standard_name'] = 'longitude'
 
-    print(unstacked_out)
+    print(target_da)
 
-    return unstacked_out
+    return target_da
 
 
 class Regridder(object):
