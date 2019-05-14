@@ -198,11 +198,11 @@ def esmf_generate_weights(
         print(out.decode('utf-8'))
 
         weights = xarray.open_dataset(weight_file.name)
+        # Load so we can delete the temp file
         return weights.load()
 
     except subprocess.CalledProcessError as e:
         print(e)
-        print(e.stderr)
         print(e.output.decode('utf-8'))
         raise
 
