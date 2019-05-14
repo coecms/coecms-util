@@ -6,11 +6,12 @@ source:
     git_url: ../
 
 build:
+    noarch: python
+    script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed"
     number: {{ GIT_DESCRIBE_NUMBER }}
-    script: python setup.py install --single-version-externally-managed --record=record.txt
 
 requirements:
-    build:
+    host:
         - python
     run:
         - python
