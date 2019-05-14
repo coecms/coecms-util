@@ -19,6 +19,7 @@ from abc import ABCMeta, abstractmethod
 import six
 import xarray
 import numpy
+import iris
 
 """
 Different grid types
@@ -172,6 +173,24 @@ class LonLatGrid(Grid):
         scrip.grid_corner_lon.attrs['units'] = 'degrees'
 
         return scrip
+
+
+class UMGrid(LonLatGrid):
+    @classmethod
+    def from_mask(cls, mask_path):
+        mask = iris.load_cube(mask_path, iris.AttributeConstraint(STASH='m01s00i030'))
+        mask.coord('latitude').var_name = 'lat'
+        mask.coord('longitude').var_name = 'lon'
+
+        mask = xarray.DataArray.from_iris(mask).load()
+        mask = mask.where(mask == 0)
+
+        mask.lon.attrs['standard_name'] = 'longitude'
+        mask.lat.attrs['standard_name'] = 'latitude'
+        mask.lon.attrs['units'] = 'degrees_east'
+        mask.lat.attrs['units'] = 'degrees_north'
+
+        return mask
 
 
 class ScripGrid(Grid):

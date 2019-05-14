@@ -17,6 +17,7 @@
 # limitations under the License.
 
 from .main import cli
+from ..grid import UMGrid
 from ..regrid import regrid, esmf_generate_weights
 from ..um.create_ancillary import create_surface_ancillary
 import click
@@ -72,21 +73,7 @@ def era_sst(start_date, end_date, target_mask, output):
     Create ancil files from ERA reanalysis data
     """
 
-    mule_mask = mule.load_umfile(target_mask)
-    global_mask = mule_mask.fixed_length_header.horiz_grid_type == 0
-
-    mask = iris.load_cube(target_mask, iris.AttributeConstraint(STASH='m01s00i030'))
-    mask.coord('latitude').var_name = 'lat'
-    mask.coord('longitude').var_name = 'lon'
-
-    mask = xarray.DataArray.from_iris(mask).load()
-    mask = mask.where(mask == 0)
-
-    mask.lon.attrs['standard_name'] = 'longitude'
-    mask.lat.attrs['standard_name'] = 'latitude'
-    mask.lon.attrs['units'] = 'degrees_east'
-    mask.lat.attrs['units'] = 'degrees_north'
-
+    um_grid = UMGrid.from_mask(target_mask)
 
     file_start = start_date - pandas.offsets.MonthBegin()
     file_end = end_date + pandas.offsets.MonthEnd()
@@ -110,10 +97,10 @@ def era_sst(start_date, end_date, target_mask, output):
     ds = xarray.Dataset({'tos': tos.tos, 'sic': sic.sic})
     ds = ds.sel(time=slice(start_date, end_date))
 
-    weights = esmf_generate_weights(tos.tos.isel(time=0), mask, method='patch')
+    weights = esmf_generate_weights(tos.tos.isel(time=0), um_grid, method='patch')
     newds = regrid(ds, weights=weights)
 
     print(newds)
 
-    ancil = create_surface_ancillary(newds, {'tos': 507, 'sic': 31})
+    ancil = create_surface_ancillary(newds, {'tos': 24, 'sic': 31})
     ancil.to_file(output)

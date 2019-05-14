@@ -201,10 +201,8 @@ def esmf_generate_weights(
         return weights.load()
 
     except subprocess.CalledProcessError as e:
-        print(e.output.decode('utf-8'))
-        raise
-
-    except subprocess.CalledProcessError as e:
+        print(e)
+        print(e.stderr)
         print(e.output.decode('utf-8'))
         raise
 
