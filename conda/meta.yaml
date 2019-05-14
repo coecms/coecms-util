@@ -25,6 +25,7 @@ requirements:
         - xarray
         - whichcraft # [py2k]
         - hdf5>=1.10.1 # Missing dependency of CDO
+        - iris
 
 test:
     requires:
