@@ -20,6 +20,9 @@ import six
 import xarray
 import numpy
 import iris
+import mule
+import os
+
 
 """
 Different grid types
@@ -185,9 +188,9 @@ class UMGrid(LonLatGrid):
                 mask_field = f
                 break
 
-        mask = xarray.DataArray(mask_field.load_data(), dims=['lon', 'lat'])
-        mask.coords['lon'] = mask_field.bzx + numpy.linspace(1, mask.shape[0]) * mask_field.bdx
-        mask.coords['lat'] = mask_field.bzy + numpy.linspace(1, mask.shape[0]) * mask_field.bdy
+        mask = xarray.DataArray(mask_field.get_data(), dims=['lat', 'lon'], name=os.path.basename(mask_path))
+        mask.coords['lon'] = mask_field.bzx + (1+numpy.arange(mask.shape[1])) * mask_field.bdx
+        mask.coords['lat'] = mask_field.bzy + (1+numpy.arange(mask.shape[0])) * mask_field.bdy
 
         mask = mask.where(mask == 0)
 
