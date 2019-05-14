@@ -69,6 +69,7 @@ def test_call_regrid(tmpdir):
         coords={'lat': [-45, 45], 'lon': [0, 180]})
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
+    a0 = a0.astype('f4')
 
     r = regrid(a0, a0)
 
@@ -86,6 +87,7 @@ def test_manual_weights(tmpdir):
         coords={'lat': [-45, 45], 'lon': [0, 180]})
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
+    a0 = a0.astype('f4')
 
     grid = identify_grid(a0)
     weights = cdo_generate_weights(a0, grid)
@@ -103,6 +105,7 @@ def test_compare_regrids(tmpdir):
         coords={'lat': [-45, 45], 'lon': [0, 180]})
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
+    a0 = a0.astype('f4')
 
     compare_regrids(tmpdir.mkdir('a0a0'), a0, a0)
 
@@ -141,6 +144,7 @@ def test_3d_regrid(tmpdir):
         coords={'lat': [-45, 45], 'lon': [0, 180], 'time': [0, 1, 2]})
     a0.lat.attrs['units'] = 'degrees_north'
     a0.lon.attrs['units'] = 'degrees_east'
+    a0 = a0.astype('f4')
 
     r = regrid(a0, a0)
 

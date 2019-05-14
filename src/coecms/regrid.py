@@ -15,7 +15,7 @@
 # limitations under the License.
 from __future__ import print_function
 
-from .dimension import remove_degenerate_axes
+from .dimension import remove_degenerate_axes, identify_lat_lon
 from .grid import *
 
 from datetime import datetime
@@ -198,9 +198,11 @@ def esmf_generate_weights(
         print(out.decode('utf-8'))
 
         weights = xarray.open_dataset(weight_file.name)
-        return weights
+        # Load so we can delete the temp file
+        return weights.load()
 
     except subprocess.CalledProcessError as e:
+        print(e)
         print(e.output.decode('utf-8'))
         raise
 
@@ -246,6 +248,8 @@ def apply_weights(source_data, weights):
         dst_grid_center_lon = w.xc_b.data.reshape(
             dst_grid_shape[::-1], order='C')
 
+        dst_mask = w.mask_b
+
         axis_scale = 1  # Weight lat/lon in degrees
 
     else:
@@ -261,69 +265,75 @@ def apply_weights(source_data, weights):
         dst_grid_center_lon = w.dst_grid_center_lon.data.reshape(
             dst_grid_shape[::-1], order='C')
 
+        dst_mask = w.dst_grid_imask
+
         axis_scale = 180.0 / math.pi  # Weight lat/lon in radians
 
-    # Use sparse instead of scipy as it behaves better with Dask
-    weight_matrix = sparse.COO([src_address.data, dst_address.data],
+    # Check lat/lon are the last axes
+    source_lat, source_lon = identify_lat_lon(source_data)
+    if not (source_lat.name in source_data.dims[-2:] and
+            source_lon.name in source_data.dims[-2:]):
+        raise Exception("Last two dimensions should be spatial coordinates,"
+                        f" got {source_data.dims[-2:]}")
+
+    kept_shape = list(source_data.shape[0:-2])
+    kept_dims = list(source_data.dims[0:-2])
+
+    # Create a sparse array from the weights
+    sparse_weights = sparse.COO([src_address.data, dst_address.data],
                                remap_matrix.data,
                                shape=w_shape,
                                )
-    weight_matrix = weight_matrix.todense()
 
-    # Grab the target grid lats and lons - these are 1d arrays that we need to
-    # reshape to the correct size
-    lat = xarray.DataArray(dst_grid_center_lat, name='lat', dims=['i', 'j'])
-    lon = xarray.DataArray(dst_grid_center_lon, name='lon', dims=['i', 'j'])
+    # Remove the spatial axes, apply the weights, add the spatial axes back
+    source_array = source_data.data
+    if isinstance(source_array, dask.array.Array):
+        source_array = dask.array.reshape(source_array,
+                kept_shape +  [-1])
+    else:
+        source_array = numpy.reshape(source_array, kept_shape + [-1])
 
-    # Reshape the source dataset, so that the last dimension is a 1d array over
-    # the lats and lons that we can multiply against the weights array
-    stacked_source = source_data.stack(latlon=('lat', 'lon'))
-    stacked_source_masked = dask.array.ma.fix_invalid(stacked_source)
-    dask.array.ma.set_fill_value(stacked_source_masked, 0)
+    # Handle input mask
+    dask.array.ma.set_fill_value(source_array, 1e20)
+    source_array = dask.array.ma.fix_invalid(source_array)
+    source_array = dask.array.ma.filled(source_array)
 
-    # With the horizontal grid as a 1d array in the last dimension,
-    # dask.array.matmul will multiply the horizontal grid by the weights for
-    # each time/level for free, so we can avoid manually looping
+    target_dask = dask.array.tensordot(source_array, sparse_weights, axes=1)
+    target_dask = dask.array.reshape(target_dask,
+            kept_shape + [dst_grid_shape[1], dst_grid_shape[0]])
 
-    #data = sparse.matmul(stacked_source_masked.compute(), weight_matrix)
-    data = dask.array.tensordot(stacked_source_masked, weight_matrix, axes=1)
-    mask = dask.array.tensordot(dask.array.ma.getmaskarray(
-        stacked_source_masked), weight_matrix, axes=1)
+    # Create a new DataArray for the output
+    target_da = xarray.DataArray(target_dask,
+                                 dims=kept_dims + ['i', 'j'],
+                                 coords={k:v for k,v in source_data.coords.items()
+                                     if set(v.dims).issubset(kept_dims)},
+                                 name=source_data.name)
+    target_da.coords['lat'] = xarray.DataArray(dst_grid_center_lat, dims=['i','j'])
+    target_da.coords['lon'] = xarray.DataArray(dst_grid_center_lon, dims=['i','j'])
 
-    # Convert the regridded data into a xarray.DataArray. A bit of trickery is
-    # required with the coordinates to get them back into two dimensions - at
-    # this stage the horizontal grid is still stacked into one dimension
-    out = xarray.DataArray(data, #dask.array.ma.masked_array(data, mask=(mask != 0)),
-                           dims=stacked_source.dims,
-                           coords={
-                               k: v for k, v in stacked_source.coords.items() if k != 'latlon'},
-                           name=source_data.name,
-                           attrs=source_data.attrs)
+    # Mask
+    target_da = target_da.where(dst_mask.data.reshape([dst_grid_shape[1], dst_grid_shape[0]]) == 1)
 
-    # Add the new grid coordinates, stacking them the same way we stacked the source data
-    out.coords['lat'] = lat.stack(latlon=('i', 'j'))
-    out.coords['lon'] = lon.stack(latlon=('i', 'j'))
-
-    # Now the coordinates have been added we can unstack the 'latlon' dimension
-    # back into ('i', 'j').
-    unstacked_out = out.unstack('latlon')
-
-    # The coordinates in the weight file are 2d. If this is just a lat-lon grid
-    # we should remove the unneccessary dimension from the coordinates
-    unstacked_out.coords['lat'] = remove_degenerate_axes(unstacked_out.lat)
-    unstacked_out.coords['lon'] = remove_degenerate_axes(unstacked_out.lon)
+    # Clean up coordinates
+    target_da.coords['lat'] = remove_degenerate_axes(target_da.lat)
+    target_da.coords['lon'] = remove_degenerate_axes(target_da.lon)
 
     # Convert to degrees if needed
-    unstacked_out.coords['lat'] = unstacked_out.lat * axis_scale
-    unstacked_out.coords['lon'] = unstacked_out.lon * axis_scale
+    target_da.coords['lat'] = target_da.lat * axis_scale
+    target_da.coords['lon'] = target_da.lon * axis_scale
+
+    # Regular grids should use 'lat', 'lon' as dimension names, curved grids
+    # use 'i', 'j'
+    if target_da.coords['lat'].ndim == 1 and target_da.coords['lon'].ndim == 1:
+        target_da = target_da.rename({'i': 'lat', 'j': 'lon'})
 
     # Add metadata to the coordinates
-    unstacked_out.coords['lat'].attrs['units'] = 'degrees_north'
-    unstacked_out.coords['lat'].attrs['standard_name'] = 'latitude'
-    unstacked_out.coords['lon'].attrs['units'] = 'degrees_east'
-    unstacked_out.coords['lon'].attrs['standard_name'] = 'longitude'
+    target_da.coords['lat'].attrs['units'] = 'degrees_north'
+    target_da.coords['lat'].attrs['standard_name'] = 'latitude'
+    target_da.coords['lon'].attrs['units'] = 'degrees_east'
+    target_da.coords['lon'].attrs['standard_name'] = 'longitude'
 
-    return unstacked_out
+    return target_da
 
 
 class Regridder(object):
@@ -363,13 +373,18 @@ class Regridder(object):
         """Regrid ``source_data`` to match the target grid
 
         Args:
-            source_data (:class:`xarray.DataArray`): Source variable
+            source_data (:class:`xarray.DataArray` or xarray.Dataset): Source
+            variable
 
         Returns:
-            :class:`xarray.DataArray` with a regridded version of the source variable
+            :class:`xarray.DataArray` or xarray.Dataset with a regridded
+            version of the source variable
         """
 
-        return apply_weights(source_data, self.weights)
+        if isinstance(source_data, xarray.Dataset):
+            return source_data.apply(self.regrid)
+        else:
+            return apply_weights(source_data, self.weights)
 
 
 def regrid(source_data, target_grid=None, weights=None):

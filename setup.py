@@ -24,5 +24,6 @@ setup(
             ],
         entry_points = {
             'console_scripts': [
+                'coecms=coecms.cli:cli',
                 ]}
         )
