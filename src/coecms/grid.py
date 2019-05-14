@@ -178,11 +178,17 @@ class LonLatGrid(Grid):
 class UMGrid(LonLatGrid):
     @classmethod
     def from_mask(cls, mask_path):
-        mask = iris.load_cube(mask_path, iris.AttributeConstraint(STASH='m01s00i030'))
-        mask.coord('latitude').var_name = 'lat'
-        mask.coord('longitude').var_name = 'lon'
+        umfile = mule.load_umfile(mask_path)
+        mask_field = None
+        for f in umfile.fields:
+            if f.lbuser4 == 30:
+                mask_field = f
+                break
 
-        mask = xarray.DataArray.from_iris(mask).load()
+        mask = xarray.DataArray(mask_field.load_data(), dims=['lon', 'lat'])
+        mask.coords['lon'] = mask_field.bzx + numpy.linspace(1, mask.shape[0]) * mask_field.bdx
+        mask.coords['lat'] = mask_field.bzy + numpy.linspace(1, mask.shape[0]) * mask_field.bdy
+
         mask = mask.where(mask == 0)
 
         mask.lon.attrs['standard_name'] = 'longitude'
